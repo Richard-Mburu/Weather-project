@@ -1,0 +1,1036 @@
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --font-sans:'Lato',sans-serif;--font-heading:'Oswald',sans-serif;
+  --color-border-tertiary:#ccc;--color-text-primary:#000;--color-text-secondary:#666;
+  --color-text-tertiary:#999;--color-text-info:#007acc;--color-text-danger:#d32f2f;
+  --color-background-primary:#fff;--color-background-secondary:#f5f5f5;
+  --color-background-info:#e3f2fd;--color-background-success:#e8f5e8;
+  --color-border-secondary:#ddd;--color-border-success:#4caf50;
+  --border-radius-md:4px;--border-radius-lg:8px;
+  --status-sim:#64748b;--status-live:#10b981;--status-api:#6366f1;
+}
+h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+*{margin:0;padding:0;box-sizing:border-box}
+.app{font-family:var(--font-sans);width:100%;background:#fff}
+
+/* ── DASHBOARD BAR ── */
+.dash{display:flex;gap:0;border-bottom:1px solid var(--color-border-tertiary);background:#fff}
+.dash-cell{flex:1;display:flex;align-items:center;gap:10px;padding:8px 14px;border-right:0.5px solid var(--color-border-tertiary)}
+.dash-cell:last-child{border-right:none}
+.dash-dot{width:11px;height:11px;border-radius:50%;flex-shrink:0}
+.dash-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-secondary)}
+.dash-count{font-size:22px;font-weight:700;font-family:var(--font-heading);line-height:1}
+.dash-sub{font-size:10px;color:var(--color-text-tertiary);margin-top:1px}
+.dash-trend{margin-left:auto;font-size:11px;font-weight:600;padding:2px 6px;border-radius:3px}
+.dash-up{background:#fdecea;color:#c62828}
+.dash-dn{background:#e8f5e9;color:#2e7d32}
+.dash-eq{background:#f5f5f5;color:#666}
+
+/* ── HEADER ── */
+.hdr{display:flex;align-items:center;gap:10px;padding:8px 0 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+.hdr-title{font-size:14px;font-weight:500;color:var(--color-text-primary);font-family:var(--font-heading)}
+.hdr-pill{background:var(--color-background-info);color:var(--color-text-info);font-size:11px;padding:2px 8px;border-radius:20px}
+.hdr-spacer{flex:1}
+.hdr-right{display:flex;align-items:center;gap:12px}
+.hdr-right label{font-size:12px;color:var(--color-text-secondary)}
+select{font-family:var(--font-sans);font-size:12px}
+.search-wrap{position:relative;display:flex;align-items:center;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:2px 8px;border:1px solid var(--color-border-secondary)}
+.search-wrap input{border:none;background:transparent;padding:4px;font-size:12px;width:180px;outline:none}
+.search-wrap i{color:var(--color-text-tertiary)}
+.upload-btn{display:flex;align-items:center;gap:5px;font-size:12px;padding:4px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer;font-family:var(--font-sans)}
+.upload-btn:hover{background:var(--color-background-secondary)}
+
+/* ── BODY ── */
+.body{display:flex;height:510px;border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);overflow:hidden}
+
+/* ── SIDEBAR ── */
+.sidebar{width:175px;background:#1e293b;border-right:0.5px solid var(--color-border-tertiary);display:flex;flex-direction:column;overflow-y:auto;flex-shrink:0}
+.sidebar *{color:#fff !important}
+.sb-block{padding:11px 12px;border-bottom:0.5px solid rgba(255,255,255,0.2)}
+.sb-head{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.metric-btn{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:var(--border-radius-md);border:0.5px solid transparent;background:transparent;cursor:pointer;font-family:var(--font-sans);font-size:12px;text-align:left;transition:all .12s}
+.metric-btn:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.3)}
+.metric-btn.active{background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.5);font-weight:600}
+.metric-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.ltog{display:flex;align-items:center;gap:7px;padding:3px 0;cursor:pointer}
+.ltog label{font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px}
+.ltog input{accent-color:#fff;cursor:pointer}
+.leg-row{display:flex;align-items:center;gap:7px;padding:2px 0}
+.leg-sw{width:22px;height:9px;border-radius:2px;flex-shrink:0}
+.leg-lbl{font-size:11px}
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:0.5px solid rgba(255,255,255,0.15)}
+.stat-row:last-child{border-bottom:none}
+.stat-k{font-size:11px}
+.stat-v{font-size:12px;font-weight:500}
+
+/* ── MAP ── */
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+
+/* ── HOVER CARD ── */
+.hcard{position:absolute;bottom:10px;right:8px;background:#fff;border:0.5px solid var(--color-border-secondary);border-radius:var(--border-radius-lg);padding:11px 13px;min-width:210px;z-index:900;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 2px 12px rgba(0,0,0,.1)}
+.hcard.show{opacity:1}
+.hc-name{font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:7px;font-family:var(--font-heading)}
+.hc-grid{display:grid;grid-template-columns:auto 1fr auto;gap:3px 8px;font-size:11px;align-items:center}
+.hc-k{color:var(--color-text-tertiary)}
+.hc-v{color:var(--color-text-primary);font-weight:500}
+.hc-trend{font-size:10px;font-weight:700;text-align:right}
+.trend-up{color:#c62828}
+.trend-dn{color:#2e7d32}
+.trend-eq{color:#999}
+.hc-divider{grid-column:1/-1;height:0.5px;background:var(--color-border-secondary);margin:3px 0}
+.hc-risk-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;margin-top:5px}
+
+@keyframes wind-drift {
+  0% { transform: translate(0,0); opacity: 0.8; }
+  50% { transform: translate(4px, 4px); opacity: 1; }
+  100% { transform: translate(0,0); opacity: 0.8; }
+}
+.wind-arrow-icon { animation: wind-drift 3s infinite ease-in-out; }
+
+/* ── MISC ── */
+.zoom-lbl{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:#fff;border:0.5px solid var(--color-border-tertiary);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--color-text-secondary);z-index:700;pointer-events:none;white-space:nowrap;opacity:.9}
+.csv-status{position:absolute;top:8px;left:8px;background:var(--color-background-success);border:0.5px solid var(--color-border-success);border-radius:var(--border-radius-md);padding:4px 10px;font-size:11px;z-index:900;display:none}
+.leaflet-popup-content-wrapper{border-radius:var(--border-radius-md)!important;border:0.5px solid var(--color-border-tertiary)!important;box-shadow:0 2px 12px rgba(0,0,0,.1)!important;font-family:var(--font-sans)!important}
+.marker-cluster span{font-family:var(--font-sans)!important;font-weight:500!important}
+.leaflet-choropleth-canvas{pointer-events:none}
+</style>
+
+<h2 class="sr-only">Interactive Kenya KMet rainfall, temperature, and schools forecast map</h2>
+<div class="app">
+
+  <!-- ── DASHBOARD CALLOUT BAR ── -->
+  <div class="dash" id="dashBar">
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-high)"></div>
+      <div>
+        <div class="dash-label">High Risk Schools</div>
+        <div class="dash-count" id="dHigh">–</div>
+        <div class="dash-sub">Heavy / Very Heavy rain</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dHighTrend">–</div>
+    </div>
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-med)"></div>
+      <div>
+        <div class="dash-label">Moderate Risk</div>
+        <div class="dash-count" id="dMed">–</div>
+        <div class="dash-sub">Moderate rain (30–100 mm)</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dMedTrend">–</div>
+    </div>
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-low)"></div>
+      <div>
+        <div class="dash-label">Low Risk Schools</div>
+        <div class="dash-count" id="dLow">–</div>
+        <div class="dash-sub">Light / No rain</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dLowTrend">–</div>
+    </div>
+    <div class="dash-cell" style="flex:0.8">
+      <div>
+        <div class="dash-label">Nat'l Avg Rainfall</div>
+        <div class="dash-count" id="dAvgR" style="font-size:18px">–</div>
+        <div class="dash-sub">mm this week</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dAvgTrend">–</div>
+    </div>
+  </div>
+
+  <!-- ── HEADER ── -->
+  <div class="hdr">
+    <i class="ti ti-cloud-rain" aria-hidden="true" style="font-size:18px;color:var(--color-text-info)"></i>
+    <span class="hdr-title">Kenya schools + KMet forecast</span>
+    <span class="hdr-pill" id="sourceIndicator" style="background:var(--status-sim);color:#fff">Simulated</span>
+    <div class="hdr-spacer"></div>
+    <div class="hdr-right">
+      <div class="search-wrap">
+        <i class="ti ti-search"></i>
+        <input type="text" id="mapSearch" placeholder="Find a school or county..."/>
+      </div>
+      <button class="upload-btn" id="apiSyncBtn" style="background:var(--color-background-info);color:var(--color-text-info)">
+        <i class="ti ti-refresh" aria-hidden="true" style="font-size:14px"></i> Sync Live API
+      </button>
+      <label for="weekSel"><i class="ti ti-calendar" aria-hidden="true" style="font-size:14px"></i> Forecast week</label>
+      <select id="weekSel"></select>
+      <input type="file" id="csvIn" accept=".csv" style="display:none" aria-label="Load KMet CSV"/>
+      <button class="upload-btn" onclick="document.getElementById('csvIn').click()">
+        <i class="ti ti-upload" aria-hidden="true" style="font-size:14px"></i> Load CSV
+      </button>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="sidebar">
+
+      <div class="sb-block">
+        <div class="sb-head">Active layer</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <button class="metric-btn active" data-m="rain"><span class="metric-dot" style="background:#2196f3"></span>7-day rainfall</button>
+          <button class="metric-btn" data-m="tmin"><span class="metric-dot" style="background:#1d9e75"></span>Min temperature</button>
+          <button class="metric-btn" data-m="tmax"><span class="metric-dot" style="background:#d85a30"></span>Max temperature</button>
+          <button class="metric-btn" data-m="wind"><span class="metric-dot" style="background:#673ab7"></span>Wind speed</button>
+        </div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">Map layers</div>
+        <div class="ltog"><input type="checkbox" id="togHeat" checked/><label for="togHeat"><i class="ti ti-ripple" style="font-size:13px"></i> Choropleth fill</label></div>
+        <div class="ltog"><input type="checkbox" id="togCounty" checked/><label for="togCounty"><i class="ti ti-map-2" style="font-size:13px"></i> County labels</label></div>
+        <div class="ltog"><input type="checkbox" id="togWindLayer"/><label for="togWindLayer"><i class="ti ti-wind" style="font-size:13px"></i> Wind intensity</label></div>
+        <div class="ltog"><input type="checkbox" id="togSchool" checked/><label for="togSchool"><i class="ti ti-building" style="font-size:13px"></i> Schools</label></div>
+      </div>
+
+
+      <div class="sb-block">
+        <div class="sb-head">Legend</div>
+        <div id="legItems"></div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">School risk</div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-high);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">High — Heavy rain</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-med);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Moderate rain</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-low);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Low — Light/None</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:rgba(229,57,53,.35);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Cluster — zoom in</span></div>
+      </div>
+
+      <div class="sb-block" style="flex:1">
+        <div class="sb-head">Week summary</div>
+        <div class="stat-row"><span class="stat-k">Total schools</span><span class="stat-v" id="stSch">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg rainfall</span><span class="stat-v" id="stAvR">–</span></div>
+        <div class="stat-row"><span class="stat-k">Max rainfall</span><span class="stat-v" id="stMxR">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg Tmax</span><span class="stat-v" id="stTmx">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg Wind</span><span class="stat-v" id="stWnd">–</span></div>
+        <div class="stat-row"><span class="stat-k" style="color:#ffcdd2">High-risk schools</span><span class="stat-v" id="stRsk" style="color:#ffcdd2">–</span></div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">Zoom guide</div>
+        <div style="font-size:10px;line-height:1.9">
+          z5–7 &nbsp;National fill<br>
+          z8–11 &nbsp;Fill + clusters<br>
+          z12+ &nbsp;Individual schools
+        </div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="zoom-lbl" id="zLbl">National view</div>
+      <div class="csv-status" id="csvStatus"></div>
+      <div class="hcard" id="hcard">
+        <div class="hc-name" id="hcName">Hover to inspect</div>
+        <div class="hc-grid">
+          <span class="hc-k">7-day rain</span><span class="hc-v" id="hcR">–</span><span class="hc-trend" id="hcRt">–</span>
+          <span class="hc-k">Category</span><span class="hc-v" id="hcC">–</span><span></span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Tmin</span><span class="hc-v" id="hcTn">–</span><span class="hc-trend" id="hcTnt">–</span>
+          <span class="hc-k">Tmax</span><span class="hc-v" id="hcTx">–</span><span class="hc-trend" id="hcTxt">–</span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Wind Spd</span><span class="hc-v" id="hcW">–</span><span class="hc-trend" id="hcWt">–</span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Schools</span><span class="hc-v" id="hcS">–</span><span></span>
+        </div>
+        <div id="hcBadge"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-heat/0.2.0/leaflet-heat.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// DATA
+// ═══════════════════════════════════════════
+const COUNTIES=[
+  {id:1,name:'Mombasa',lat:-4.05,lon:39.67,area:229},{id:2,name:'Kwale',lat:-4.18,lon:39.45,area:8270},
+  {id:3,name:'Kilifi',lat:-3.51,lon:39.85,area:12245},{id:4,name:'Tana River',lat:-1.80,lon:40.10,area:35375},
+  {id:5,name:'Lamu',lat:-2.27,lon:40.90,area:6497},{id:6,name:'Taita-Taveta',lat:-3.40,lon:38.35,area:17084},
+  {id:7,name:'Garissa',lat:-0.45,lon:39.65,area:44175},{id:8,name:'Wajir',lat:1.75,lon:40.05,area:56686},
+  {id:9,name:'Mandera',lat:3.94,lon:41.87,area:25991},{id:10,name:'Marsabit',lat:2.34,lon:37.99,area:70961},
+  {id:11,name:'Isiolo',lat:0.35,lon:38.48,area:25336},{id:12,name:'Meru',lat:0.05,lon:37.65,area:6936},
+  {id:13,name:'Tharaka-Nithi',lat:-0.30,lon:37.92,area:2609},{id:14,name:'Embu',lat:-0.54,lon:37.46,area:2714},
+  {id:15,name:'Kitui',lat:-1.37,lon:38.01,area:24385},{id:16,name:'Machakos',lat:-1.52,lon:37.26,area:5952},
+  {id:17,name:'Makueni',lat:-1.80,lon:37.62,area:8009},{id:18,name:'Nyandarua',lat:-0.18,lon:36.52,area:3107},
+  {id:19,name:'Nyeri',lat:-0.42,lon:37.05,area:3284},{id:20,name:'Kirinyaga',lat:-0.51,lon:37.27,area:1478},
+  {id:21,name:"Murang'a",lat:-0.72,lon:37.15,area:2558},{id:22,name:'Kiambu',lat:-1.03,lon:36.83,area:2543},
+  {id:23,name:'Turkana',lat:3.11,lon:35.57,area:71597},{id:24,name:'West Pokot',lat:1.62,lon:35.10,area:9169},
+  {id:25,name:'Samburu',lat:1.21,lon:36.98,area:21022},{id:26,name:'Trans-Nzoia',lat:1.05,lon:35.00,area:2494},
+  {id:27,name:'Uasin Gishu',lat:0.55,lon:35.27,area:3345},{id:28,name:'Elgeyo-Marakwet',lat:0.73,lon:35.51,area:3030},
+  {id:29,name:'Nandi',lat:0.18,lon:35.12,area:2884},{id:30,name:'Baringo',lat:0.67,lon:36.10,area:11015},
+  {id:31,name:'Laikipia',lat:0.36,lon:36.78,area:9462},{id:32,name:'Nakuru',lat:-0.30,lon:35.93,area:7495},
+  {id:33,name:'Narok',lat:-1.08,lon:35.87,area:17921},{id:34,name:'Kajiado',lat:-1.85,lon:36.78,area:21924},
+  {id:35,name:'Kericho',lat:-0.37,lon:35.28,area:2479},{id:36,name:'Bomet',lat:-0.78,lon:35.35,area:1997},
+  {id:37,name:'Kakamega',lat:0.28,lon:34.75,area:3033},{id:38,name:'Vihiga',lat:0.08,lon:34.73,area:531},
+  {id:39,name:'Bungoma',lat:0.57,lon:34.56,area:3032},{id:40,name:'Busia',lat:0.46,lon:34.11,area:1695},
+  {id:41,name:'Siaya',lat:-0.06,lon:34.29,area:2530},{id:42,name:'Kisumu',lat:-0.10,lon:34.76,area:2085},
+  {id:43,name:'Homa Bay',lat:-0.52,lon:34.46,area:3183},{id:44,name:'Migori',lat:-1.06,lon:34.47,area:2586},
+  {id:45,name:'Kisii',lat:-0.68,lon:34.77,area:1317},{id:46,name:'Nyamira',lat:-0.57,lon:34.93,area:912},
+  {id:47,name:'Nairobi',lat:-1.29,lon:36.82,area:696}
+];
+
+const BASE={};
+COUNTIES.forEach(c=>{
+  let rain=22,tmin=17,tmax=29,wind=12,wind_dir=45;
+  if(c.lon<35.5&&c.lat>-2){rain=115;tmin=12;tmax=23;}
+  else if(c.lat<-3.5||(c.lon>39&&c.lat<-1)){rain=70;tmin=22;tmax=32;}
+  else if(Math.abs(c.lat)<1.5&&c.lon>36&&c.lon<38.5){rain=80;tmin=13;tmax=25;}
+  else if(c.lat>2){rain=8;tmin=20;tmax=36;}
+  else if(c.lon>38&&c.lat>-1){rain=10;tmin=21;tmax=37;}
+  else if(c.lat>0&&c.lon<37){rain=45;tmin=14;tmax=27;}
+  BASE[c.id]={rain,tmin,tmax,wind,wind_dir};
+});
+
+function mkRng(s){let x=s*1664525+1013904223|0;return()=>{x=x*1664525+1013904223|0;return(x>>>0)/4294967296;};}
+
+const WEEKS=Array.from({length:8},(_,i)=>{
+  const d=new Date('2026-03-10');d.setDate(d.getDate()+i*7);
+  const e=new Date(d);e.setDate(e.getDate()+6);
+  return{label:`${d.toLocaleDateString('en-KE',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'2-digit'})}`,seed:(i+1)*31337};
+});
+
+function genCData(seed){
+  const r=mkRng(seed),res={};
+  COUNTIES.forEach(c=>{
+    const b=BASE[c.id];
+    res[c.id]={
+      rain:Math.max(0,Math.round((b.rain+(r()-.45)*b.rain*.9+(r()-.5)*18)*10)/10),
+      tmin:Math.round((b.tmin+(r()-.5)*2.5)*10)/10,
+      tmax:Math.round((b.tmax+(r()-.5)*3.5)*10)/10,
+      wind:Math.round((b.wind+(r()-.5)*8)*10)/10
+    };
+  });
+  return res;
+}
+
+function nearest(lat,lon){
+  let best=COUNTIES[0],bd=Infinity;
+  COUNTIES.forEach(c=>{const d=(c.lat-lat)**2+(c.lon-lon)**2;if(d<bd){bd=d;best=c;}});
+  return{c:best,d2:bd};
+}
+
+// ═══════════════════════════════════════════
+// COLOUR SCHEMES — KMD palette
+// ═══════════════════════════════════════════
+const SCHEMES={
+  rain:{
+    classify:v=>{
+      if(v<0.5)return{color:'#e8f4fd',label:'Dry (0 mm)',risk:'low',desc:'Mostly dry week'};
+      if(v<30) return{color:'#a8d8ea',label:'Light (<30 mm)',risk:'low',desc:'Gentle rain, drizzle'};
+      if(v<100)return{color:'#2196f3',label:'Moderate (30–100 mm)',risk:'med',desc:'Steady, noticeable rain'};
+      if(v<250)return{color:'#0d47a1',label:'Heavy (101–250 mm)',risk:'high',desc:'Intense rain, thunder'};
+      return    {color:'#4a148c',label:'Very Heavy (>250 mm)',risk:'high',desc:'Prolonged, high flood risk'};
+    },
+    legend:[
+      {color:'#e8f4fd',label:'Dry (0 mm)',border:true},
+      {color:'#a8d8ea',label:'Light  (<30 mm)'},
+      {color:'#2196f3',label:'Moderate  (30–100 mm)'},
+      {color:'#0d47a1',label:'Heavy  (101–250 mm)'},
+      {color:'#4a148c',label:'Very Heavy  (>250 mm)'}
+    ]
+  },
+  tmin:{
+    classify:v=>{
+      if(v<10)return{color:'#3c3489',label:'Cold (<10 °C)',risk:'low'};
+      if(v<14)return{color:'#1e88e5',label:'Cool (10–14 °C)',risk:'low'};
+      if(v<18)return{color:'#1d9e75',label:'Mild (14–18 °C)',risk:'med'};
+      return   {color:'#d85a30',label:'Warm (>18 °C)',risk:'high'};
+    },
+    legend:[
+      {color:'#3c3489',label:'Cold  <10 °C'},
+      {color:'#1e88e5',label:'Cool  10–14 °C'},
+      {color:'#1d9e75',label:'Mild  14–18 °C'},
+      {color:'#d85a30',label:'Warm  >18 °C'}
+    ]
+  },
+  tmax:{
+    classify:v=>{
+      if(v<24)return{color:'#fac775',label:'Mild (<24 °C)',risk:'low'};
+      if(v<30)return{color:'#ef9f27',label:'Warm (24–30 °C)',risk:'low'};
+      if(v<35)return{color:'#d85a30',label:'Hot (30–35 °C)',risk:'med'};
+      return   {color:'#993c1d',label:'Very Hot (>35 °C)',risk:'high'};
+    },
+    legend:[
+      {color:'#fac775',label:'Mild  <24 °C'},
+      {color:'#ef9f27',label:'Warm  24–30 °C'},
+      {color:'#d85a30',label:'Hot  30–35 °C'},
+      {color:'#993c1d',label:'Very Hot  >35 °C'}
+    ]
+  },
+  wind:{
+    classify:v=>{
+      if(v<10)return{color:'#e8f5e9',label:'Light (<10 km/h)',risk:'low'};
+      if(v<20)return{color:'#81c784',label:'Moderate (10–20 km/h)',risk:'low'};
+      if(v<40)return{color:'#673ab7',label:'Fresh (20–40 km/h)',risk:'med'};
+      return   {color:'#b71c1c',label:'Strong (>40 km/h)',risk:'high'};
+    },
+    legend:[
+      {color:'#e8f5e9',label:'Light  <10 km/h',border:true},
+      {color:'#81c784',label:'Moderate  10–20 km/h'},
+      {color:'#673ab7',label:'Fresh  20–40 km/h'},
+      {color:'#b71c1c',label:'Strong  >40 km/h'}
+    ]
+  }
+};
+
+// School marker colour by rainfall risk
+const RISK_COLORS={high:'#e53935',med:'#fb8c00',low:'#43a047'};
+
+const RISK_CONFIG = { rain: { high: 100, med: 30 } };
+
+function calculateSchoolRisk(school, currentCData, rawPoints) {
+  if(!currentCData[school.cid]) return 'low';
+  let rainVal = currentCData[school.cid].rain || 0;
+  // If we have high-resolution CSV points, use the nearest one instead of county avg
+  if (rawPoints && rawPoints.length > 0) {
+    let bestD = Infinity;
+    rawPoints.forEach(p => {
+      const d = (p.lat - school.lat)**2 + (p.lon - school.lon)**2;
+      if (d < bestD) { bestD = d; rainVal = p.rain; }
+    });
+  }
+  if (rainVal >= RISK_CONFIG.rain.high) return 'high';
+  if (rainVal >= RISK_CONFIG.rain.med) return 'med';
+  return 'low';
+}
+
+// ═══════════════════════════════════════════
+// KENYA BOUNDARY — simplified polygon ring used to
+// clip the choropleth canvas so fill stays within borders.
+// Derived from the official admin0 boundary, simplified to ~120 points.
+// ═══════════════════════════════════════════
+const KENYA_RING=[
+  [4.62,41.90],[4.45,41.58],[4.23,41.22],[3.99,40.77],[3.86,40.45],[3.50,40.02],
+  [3.07,39.85],[2.45,40.77],[1.97,41.56],[1.75,41.23],[1.42,41.01],[1.14,40.56],
+  [0.83,40.06],[0.42,39.65],[0.18,39.43],[-0.10,39.58],[-0.41,39.60],
+  [-0.85,40.44],[-1.15,40.65],[-1.62,40.18],[-2.09,40.76],[-2.48,41.56],
+  [-2.75,41.78],[-3.07,40.97],[-3.52,39.80],[-3.96,39.20],[-4.45,39.05],
+  [-4.67,38.58],[-4.42,37.64],[-3.85,37.00],[-3.30,36.94],[-2.95,36.50],
+  [-2.50,35.97],[-1.96,34.98],[-1.49,34.18],[-1.28,34.08],[-0.99,33.94],
+  [-0.48,34.38],[-0.03,34.05],[0.38,34.08],[0.74,33.92],[1.09,34.09],
+  [1.48,34.91],[1.77,34.95],[2.04,34.36],[2.41,34.15],[2.84,34.37],
+  [3.51,35.20],[3.77,35.94],[3.97,36.83],[4.05,37.63],[4.28,38.05],
+  [4.62,38.56],[4.62,41.90]
+];
+
+// ═══════════════════════════════════════════
+// MODULE: COUNTY POLYGONS CHOROPLETH
+// Load actual county boundaries from GeoJSON
+// Falls back to centroid circles if GeoJSON fails
+// ═══════════════════════════════════════════
+const CountyChoroModule=(()=>{
+  let _geoLayer=null;
+  let _countyFeatures=null;
+  let _ready=false;
+  let _useFallback=false;
+  
+  // Build county GeoJSON from admin1 data
+  async function loadCountyGeoJSON(){
+    if(_countyFeatures)return _countyFeatures;
+    try{
+      const resp=await fetch('ken_admin1.geojson');
+      if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+      const geojson=await resp.json();
+      _countyFeatures={};
+      geojson.features.forEach(feat=>{
+        const countyName=feat.properties.adm1_name || feat.properties.adm2_name || feat.properties.name;
+        _countyFeatures[countyName]=feat;
+      });
+      _useFallback=false;
+      console.log('✓ Loaded',Object.keys(_countyFeatures).length,'counties from GeoJSON');
+      return _countyFeatures;
+    }catch(e){
+      console.warn('GeoJSON load failed, using fallback circles',e);
+      _useFallback=true;
+      return null;
+    }
+  }
+  
+  function buildFallback(map){
+    // Fallback: circles at county centroids
+    _geoLayer=L.layerGroup();
+    COUNTIES.forEach(c=>{
+      L.circle([c.lat,c.lon],{radius:Math.sqrt(c.area)*50,color:'#333',fill:true,fillOpacity:0.1,weight:1.5,opacity:0.7}).addTo(_geoLayer);
+    });
+    _geoLayer.addTo(map);
+    _ready=true;
+    _useFallback=true;
+    console.log('✓ Fallback choropleth (county circles) ready');
+  }
+  
+  function build(map){
+    loadCountyGeoJSON().then(features=>{
+      if(features){
+        _geoLayer=L.geoJSON({type: "FeatureCollection", features: Object.values(features)},{
+          style:{color:'#333',weight:1.5,opacity:0.8,fillOpacity:0},
+          interactive:false
+        });
+        _geoLayer.addTo(map);
+        _ready=true;
+        _useFallback=false;
+        document.getElementById('zLbl').innerHTML += ' <span style="color:#4caf50">● High Fidelity</span>';
+      }else{
+        buildFallback(map);
+      }
+      if(typeof refresh === 'function') { refresh(); updateDashboard(); }
+    }).catch(() => { buildFallback(map); if(typeof refresh === 'function') refresh(); });
+  }
+  
+  function update(cdata,metric){
+    if(!_geoLayer || (!_useFallback && !_countyFeatures))return;
+    
+    if(_useFallback){
+      // Fallback: recolor circles by county
+      _geoLayer.eachLayer(layer=>{
+        const latLng=layer.getLatLng();
+        if(!latLng)return;
+        const countyMatch=COUNTIES.find(c=>Math.abs(c.lat-latLng.lat)<0.1&&Math.abs(c.lon-latLng.lng)<0.1);
+        if(!countyMatch)return;
+        const metricVal=cdata[countyMatch.id][metric];
+        const{color}=SCHEMES[metric].classify(metricVal);
+        layer.setStyle({fillColor:color,fillOpacity:0.72});
+      });
+    }else{
+      // Recolor polygon layer
+      _geoLayer.eachLayer(layer=>{
+        if(!layer.feature)return;
+        // Use same property resolution logic as loadCountyGeoJSON
+        const props = layer.feature.properties;
+        const countyName = props.adm1_name || props.adm2_name || props.name;
+        
+        const countyMatch=COUNTIES.find(c=>c.name===countyName);
+        if(!countyMatch){
+          console.warn('No match for county:',countyName);
+          return;
+        }
+        const metricVal=cdata[countyMatch.id][metric];
+        const{color}=SCHEMES[metric].classify(metricVal);
+        layer.setStyle({fillColor:color,fillOpacity:0.72,fill:true});
+      });
+    }
+  }
+  
+  function setVisible(v){
+    if(!_geoLayer) return;
+    const op = v && _ready ? 0.72 : 0;
+    // Safe check: LayerGroups (fallback) don't have setStyle, but GeoJSON layers do
+    if(_geoLayer.setStyle) {
+      _geoLayer.setStyle({fillOpacity: op});
+    } else {
+      _geoLayer.eachLayer(l => { if(l.setStyle) l.setStyle({fillOpacity: op}); });
+    }
+  }
+  
+  return{build,update,setVisible};
+})();
+
+// ═══════════════════════════════════════════
+// MODULE: HEATMAP (fallback: IDW grid)
+// For demo, generates interpolated points from counties
+// For production, feed real KMet CSV grid points
+// ═══════════════════════════════════════════
+const HeatmapModule=(()=>{
+  let _heatLayer=null;
+  
+  // Generate IDW-interpolated points from county centroids
+  function genIDWPoints(cdata,metric,resolution=8,rawPoints=null){
+    if(rawPoints && rawPoints.length > 0) {
+      return rawPoints.filter(p => p[metric] !== undefined).map(p => [p.lat, p.lon, p[metric]]);
+    }
+    const points=[];
+    const bbox={minLat:-4.72,maxLat:4.62,minLon:33.88,maxLon:41.90};
+    const step=(bbox.maxLon-bbox.minLon)/resolution;
+    for(let lon=bbox.minLon;lon<=bbox.maxLon;lon+=step){
+      for(let lat=bbox.minLat;lat<=bbox.maxLat;lat+=step){
+        // Find 3 nearest counties, weight by inverse distance
+        const dists=COUNTIES.map(c=>{
+           const val = cdata[c.id] ? cdata[c.id][metric] : 0;
+           return {
+            c,val,
+            d:Math.sqrt((c.lat-lat)**2+(c.lon-lon)**2)+0.01
+           };
+        }).sort((a,b)=>a.d-b.d).slice(0,3);
+        const wSum=dists.reduce((s,d)=>s+1/d.d,0);
+        const wVal=dists.reduce((s,d)=>s+(d.val/d.d),0)/wSum;
+        points.push([lat,lon,wVal]);
+      }
+    }
+    console.log('✓ Generated',points.length,'heatmap points');
+    return points;
+  }
+  
+  function build(map, gradient){
+    // Create heatmap with visible gradient
+    try {
+      if (typeof L.heatLayer !== 'function') throw new Error('Leaflet.heat not loaded');
+      _heatLayer=L.heatLayer([],{
+        radius:50,blur:30,maxZoom:12,
+        gradient: gradient || {0.0:'#e8f4fd',0.25:'#a8d8ea',0.5:'#2196f3',0.75:'#0d47a1',1.0:'#4a148c'}
+      }).addTo(map);
+      console.log('✓ Heatmap layer created');
+    } catch(e) {
+      console.warn('Heatmap module disabled:', e.message);
+    }
+  }
+  
+  function update(cdata,metric,rawPoints=null){
+    if(!_heatLayer)return;
+    const points=genIDWPoints(cdata,metric,metric==='rain'?10:12, rawPoints);
+    _heatLayer.setLatLngs(points);
+  }
+  
+  function setVisible(v){
+    if(!_heatLayer) return;
+    if(v) _heatLayer.addTo(map);
+    else _heatLayer.remove();
+  }
+  
+  return{build,update,setVisible,genIDWPoints};
+})();
+
+// ═══════════════════════════════════════════
+// MODULE: COUNTY LABELS
+// ═══════════════════════════════════════════
+const BorderModule=(()=>{
+  let _lg=null;
+  function build(map,visible){
+    if(_lg)map.removeLayer(_lg);
+    _lg=L.layerGroup();
+    if(!visible)return;
+    COUNTIES.forEach(c=>{
+      const icon=L.divIcon({
+        className:'',
+        html:`<div style="font-family:Lato,sans-serif;font-size:9px;color:rgba(255,255,255,0.92);text-shadow:0 0 3px #000,0 0 4px #000;white-space:nowrap;pointer-events:none;font-weight:700">${c.name}</div>`,
+        iconAnchor:[0,6]
+      });
+      L.marker([c.lat,c.lon],{icon,interactive:false}).addTo(_lg);
+    });
+    map.addLayer(_lg);
+  }
+  function setVisible(map,v){if(!_lg)return;v?map.addLayer(_lg):map.removeLayer(_lg);}
+  return{build,setVisible};
+})();
+
+// ═══════════════════════════════════════════
+// MODULE: SCHOOLS  (colour by rainfall risk)
+// ═══════════════════════════════════════════
+const SCHOOLS=(()=>{
+  const r=mkRng(54321),res=[];
+  COUNTIES.forEach(c=>{
+    const n=50+Math.floor(r()*55);
+    for(let i=0;i<n;i++){
+      const type=r()<0.65?'Primary':'Secondary';
+      res.push({lat:c.lat+(r()-.5)*.9,lon:c.lon+(r()-.5)*.9,
+        county:c.name,cid:c.id,type,
+        name:`${c.name} ${type} School ${i+1}`,
+        enrollment:Math.floor(150+r()*900)});
+    }
+  });
+  return res;
+})();
+
+const SchoolModule=(()=>{
+  let _cluster=null;
+  let _schoolMarkers={}; // Store markers by school index for recoloring
+  
+
+  function build(map,visible){
+    if(_cluster){map.removeLayer(_cluster);_cluster=null;_schoolMarkers={};}
+    const filterActive = layerVis.floodOnly;
+
+    _cluster=L.markerClusterGroup({
+      maxClusterRadius:55,disableClusteringAtZoom:12,showCoverageOnHover:false,chunkedLoading:true,
+      spiderfyOnMaxZoom: true,
+      iconCreateFunction(cl){
+        const n=cl.getChildCount(),sz=n>200?40:n>50?33:27;
+        const children=cl.getAllChildMarkers();
+        let h=0,m=0,l=0;
+        children.forEach(mk=>{const r=mk._risk;if(r==='high')h++;else if(r==='med')m++;else l++;});
+        const bg=h>0?'rgba(229,57,53,.82)':m>0?'rgba(251,140,0,.82)':'rgba(67,160,71,.82)';
+        return L.divIcon({
+          html:`<div style="width:${sz}px;height:${sz}px;border-radius:50%;background:${bg};display:flex;align-items:center;justify-content:center;color:#fff;font-size:${sz>33?11:10}px;font-weight:600;border:1.5px solid rgba(255,255,255,.4)">${n}</div>`,
+          className:'',iconSize:[sz,sz]
+        });
+      }
+    });
+
+    SCHOOLS.forEach((s,idx)=>{
+      const risk = calculateSchoolRisk(s, cdata, rawCsvData);
+      const col=RISK_COLORS[risk];
+
+      const mk=L.circleMarker([s.lat,s.lon],{radius:5,fillColor:col,fillOpacity:.92,color:'rgba(255,255,255,.35)',weight:1.2});
+      mk._schoolIdx=idx;
+      mk._risk=risk;
+      mk.bindPopup(()=>{
+        const d=cdata[s.cid];
+        const{label}=SCHEMES.rain.classify(d.rain);
+        const risk=calculateSchoolRisk(s, cdata, rawCsvData);
+        return`<div style="font-family:Lato,sans-serif;min-width:195px;padding:2px">
+          <div style="font-size:13px;font-weight:600;margin-bottom:6px;color:#000">${s.name}</div>
+          <div style="margin-bottom:6px">
+            <span style="display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;background:${col}22;color:${col};border:1px solid ${col}55">${riskLabel(risk)}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:3px 10px;font-size:11px">
+            <span style="color:#999">County</span><span>${s.county}</span>
+            <span style="color:#999">Type</span><span>${s.type}</span>
+            <span style="color:#999">Enrollment</span><span>${s.enrollment.toLocaleString()} pupils</span>
+            <span style="color:#999">7-day rain</span><span style="font-weight:600;color:${col}">${d.rain} mm · ${label}</span>
+            <span style="color:#999">Tmin / Tmax</span><span>${d.tmin}°C / ${d.tmax}°C</span>
+            <span style="color:#999">Conditions</span><span>${d.tmin}°C / ${d.tmax}°C · ${d.wind} km/h Wind</span>
+          </div></div>`;
+      },{maxWidth:240});
+      mk.on('mouseover',()=>fillCard(s.county+' — '+s.name,s.cid));
+      mk.on('mouseout',hideCard);
+      _schoolMarkers[idx]=mk;
+      _cluster.addLayer(mk);
+    });
+    if(visible)map.addLayer(_cluster);
+  }
+  
+  function findAndZoom(query){
+    const q = query.toLowerCase();
+    const match = SCHOOLS.find(s => s.name.toLowerCase().includes(q));
+    if(match) {
+      map.flyTo([match.lat, match.lon], 14);
+      return true;
+    }
+    return false;
+  }
+
+  function recolorMarkers(){
+    // Recolor all markers based on current cdata rainfall
+    SCHOOLS.forEach((s,idx)=>{
+      const mk=_schoolMarkers[idx];
+      if(!mk)return;
+      const newRisk=calculateSchoolRisk(s, cdata, rawCsvData);
+      const newCol=RISK_COLORS[newRisk];
+      mk.setStyle({fillColor:newCol});
+      mk._risk=newRisk;
+    });
+    if(_cluster)_cluster.refreshClusters();
+  }
+  
+  function setVisible(map,v){if(!_cluster)return;v?map.addLayer(_cluster):map.removeLayer(_cluster);}
+  
+  return{build,recolorMarkers,setVisible,findAndZoom};
+})();
+
+// ═══════════════════════════════════════════
+// TREND helper — compare county value to previous week
+// ═══════════════════════════════════════════
+let prevCdata=null;
+
+function getTrendData(curr, prev, badIsUp = true) {
+  if (prev === null || prev === undefined) return { cls: 'trend-eq', text: '–' };
+  const diff = curr - prev;
+  if (Math.abs(diff) < 0.1) return { cls: 'trend-eq', text: '→ 0' };
+  const isUp = diff > 0;
+  const cls = isUp === badIsUp ? 'trend-up' : 'trend-dn';
+  const arrow = isUp ? '↑' : '↓';
+  return { cls, text: `${arrow} ${Math.abs(diff).toFixed(1)}` };
+}
+
+// ═══════════════════════════════════════════
+// HOVER CARD
+// ═══════════════════════════════════════════
+function fillCard(title,cid){
+  const d=cdata[cid];
+  const prev=prevCdata?prevCdata[cid]:null;
+  const{label,color,risk}=SCHEMES.rain.classify(d.rain);
+  const sc=SCHOOLS.filter(s=>s.cid===cid).length;
+
+  document.getElementById('hcR').textContent=d.rain+' mm';
+  const rTr = getTrendData(d.rain, prev ? prev.rain : null, true);
+  document.getElementById('hcRt').className = `hc-trend ${rTr.cls}`;
+  document.getElementById('hcRt').textContent = rTr.text + ' mm';
+
+  document.getElementById('hcC').textContent=label;
+  document.getElementById('hcC').style.color=color;
+
+  const tnTr = getTrendData(d.tmin, prev ? prev.tmin : null, false);
+  document.getElementById('hcTn').textContent = d.tmin+'°C';
+  document.getElementById('hcTnt').className = `hc-trend ${tnTr.cls}`;
+  document.getElementById('hcTnt').textContent = tnTr.text + '°C';
+
+  const wTr = getTrendData(d.wind, prev ? prev.wind : null, true);
+  document.getElementById('hcW').textContent = d.wind+' km/h';
+  document.getElementById('hcWt').className = `hc-trend ${wTr.cls}`;
+  document.getElementById('hcWt').textContent = wTr.text + ' km/h';
+
+  document.getElementById('hcS').textContent=sc+' schools';
+
+  // Risk badge
+  const riskCol={high:'#e53935',med:'#fb8c00',low:'#43a047'}[risk];
+  const riskText={high:'HIGH RISK — immediate attention',med:'MODERATE — monitor closely',low:'LOW RISK — normal operations'}[risk];
+  document.getElementById('hcBadge').innerHTML=`<div class="hc-risk-badge" style="background:${riskCol}18;color:${riskCol};border:1px solid ${riskCol}44">${riskText}</div>`;
+
+  document.getElementById('hcard').classList.add('show');
+}
+function hideCard(){document.getElementById('hcard').classList.remove('show');}
+
+// ═══════════════════════════════════════════
+// DASHBOARD CALLOUT
+// ═══════════════════════════════════════════
+function updateDashboard(){
+  let high=0,med=0,low=0;
+  SCHOOLS.forEach(s=>{const r=calculateSchoolRisk(s, cdata, rawCsvData);if(r==='high')high++;else if(r==='med')med++;else low++;});
+  const avgR=(COUNTIES.reduce((s,c)=>s+cdata[c.id].rain,0)/COUNTIES.length);
+
+  const setCell=(id,val,prevVal,unit,badIsUp=true)=>{
+    document.getElementById(id).textContent=val.toLocaleString()+(unit||'');
+    const tEl=document.getElementById(id+'Trend');
+    if(prevVal===null){tEl.textContent='–';tEl.className='dash-trend dash-eq';return;}
+    const diff=val-prevVal;
+    if(Math.abs(diff)<0.5){tEl.textContent='→ no change';tEl.className='dash-trend dash-eq';return;}
+    const up=diff>0;
+    tEl.textContent=(up?'↑ ':'↓ ')+Math.abs(diff).toFixed(unit?' 1':0)+(unit||'');
+    // badIsUp: for risk counts, up is bad (red); for avg rainfall up is bad
+    tEl.className='dash-trend '+(up===badIsUp?'dash-up':'dash-dn');
+  };
+
+  const ind = document.getElementById('sourceIndicator');
+  if(rawCsvData) { ind.textContent = 'KMet Live'; ind.style.background = 'var(--status-live)'; }
+  else { ind.textContent = 'Simulated'; ind.style.background = 'var(--status-sim)'; }
+  if(ind.dataset.mode === 'api') { ind.textContent = 'Live API'; ind.style.background = 'var(--status-api)'; }
+
+  let pH=null,pM=null,pL=null,pA=null;
+  if(prevCdata){
+    let ph=0,pm=0,pl=0;
+    SCHOOLS.forEach(s=>{ const r = calculateSchoolRisk(s, prevCdata, null); if(r==='high')ph++; else if(r==='med')pm++; else pl++; });
+    pH=ph;pM=pm;pL=pl; pA=COUNTIES.reduce((s,c)=>s+prevCdata[c.id].rain,0)/COUNTIES.length;
+  }
+
+  setCell('dHigh',high,pH,'',true);
+  setCell('dMed',med,pM,'',true);
+  setCell('dLow',low,pL,'',false); // low risk going up is good
+  setCell('dAvgR',Math.round(avgR*10)/10,pA,' mm',true);
+}
+
+// ═══════════════════════════════════════════
+// LEGEND + STATS
+// ═══════════════════════════════════════════
+function updateLegend(){
+  const scheme = SCHEMES[activeMetric];
+  let html = '';
+  scheme.legend.forEach(l => {
+    // Extract numeric threshold for matching description, but adjust for range logic
+    let val = parseFloat(l.label.replace(/[^0-9.]/g, '')) || 0;
+    if (l.label.includes('<')) val = val - 1; 
+    if (l.label.includes('>')) val = val + 1;
+    
+    const classification = scheme.classify(val);
+    const desc = classification.desc || '';
+
+    html += `<div class="leg-row" style="margin-bottom:6px">
+      <div class="leg-sw" style="background:${l.color}${l.border?';border:0.5px solid #aaa':''};height:12px"></div>
+      <div style="display:flex;flex-direction:column"><span class="leg-lbl" style="font-weight:700">${l.label}</span>
+      <span style="font-size:9px;color:rgba(255,255,255,0.7);line-height:1">${desc}</span></div>
+    </div>`;
+  });
+  document.getElementById('legItems').innerHTML = html;
+}
+function updateStats(){
+  const vals=COUNTIES.map(c=>cdata[c.id]);
+  document.getElementById('stSch').textContent=SCHOOLS.length.toLocaleString();
+  document.getElementById('stAvR').textContent=(vals.reduce((s,v)=>s+v.rain,0)/vals.length).toFixed(1)+' mm';
+  document.getElementById('stMxR').textContent=Math.max(...vals.map(v=>v.rain)).toFixed(1)+' mm';
+  document.getElementById('stTmx').textContent=(vals.reduce((s,v)=>s+v.tmax,0)/vals.length).toFixed(1)+'°C';
+  document.getElementById('stWnd').textContent=(vals.reduce((s,v)=>s+v.wind,0)/vals.length).toFixed(1)+' km/h';
+  const atRisk=SCHOOLS.filter(s=>cdata[s.cid].rain>=100).length;
+  document.getElementById('stRsk').textContent=atRisk.toLocaleString();
+}
+function updateZoomLabel(){
+  const z=map.getZoom();
+  document.getElementById('zLbl').textContent=
+    z<7?'National view — smooth fill':z<12?'County view — clusters visible':'Local view — individual schools';
+}
+
+// ═══════════════════════════════════════════
+// LIVE API INTEGRATION (Open-Meteo)
+// ═══════════════════════════════════════════
+async function fetchLiveAPI() {
+  const ind = document.getElementById('sourceIndicator');
+  ind.textContent = 'Syncing...';
+  try {
+    const lats = COUNTIES.map(c => c.lat).join(',');
+    const lons = COUNTIES.map(c => c.lon).join(',');
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lats}&longitude=${lons}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,windspeed_10m_max,winddirection_10m_dominant&timezone=Africa%2FNairobi`;
+    
+    const resp = await fetch(url);
+    const data = await resp.json();
+    
+    const nd = {};
+    COUNTIES.forEach((c, i) => {
+      const daily = data[i].daily;
+      nd[c.id] = {
+        rain: daily.precipitation_sum[0],
+        tmin: daily.temperature_2m_min[0],
+        tmax: daily.temperature_2m_max[0],
+        wind: daily.windspeed_10m_max[0],
+        wind_dir: daily.winddirection_10m_dominant ? daily.winddirection_10m_dominant[0] : 0
+      };
+    });
+    prevCdata = {...cdata}; cdata = nd;
+    ind.dataset.mode = 'api'; refresh(); SchoolModule.recolorMarkers();
+  } catch(e) {
+    alert('API Sync failed: ' + e.message);
+    ind.textContent = 'Error';
+  }
+}
+
+// ═══════════════════════════════════════════
+// CSV LOADER
+// ═══════════════════════════════════════════
+function loadCSV(file,onDone){
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    const lines=ev.target.result.trim().split('\n');
+    const sep=lines[0].includes('\t')?'\t':',';
+    const hdrs=lines[0].split(sep).map(h=>h.trim().toLowerCase());
+    const iLon=hdrs.indexOf('lon'),iLat=hdrs.indexOf('lat');
+    const iR=hdrs.findIndex(h=>h==='rain'),iTn=hdrs.findIndex(h=>h==='tmin'),iTx=hdrs.findIndex(h=>h==='tmax');
+    if(iLon<0||iLat<0||iR<0){alert('CSV needs: lon, lat, Rain');return;}
+    const agg={}; const raw=[]; COUNTIES.forEach(c=>{agg[c.id]={rain:[],tmin:[],tmax:[],wind:[]};});
+    let n=0;
+    for(let i=1;i<lines.length;i++){
+      const cols=lines[i].split(sep);
+      const lon=+cols[iLon],lat=+cols[iLat],rain=+cols[iR];
+      const tmin=iTn>=0?+cols[iTn]:NaN,tmax=iTx>=0?+cols[iTx]:NaN;
+      if(isNaN(lon)||isNaN(lat)||isNaN(rain))continue;n++;
+      const{c}=nearest(lat,lon);
+      agg[c.id].rain.push(rain);
+      if(!isNaN(tmin))agg[c.id].tmin.push(tmin);
+      if(!isNaN(tmax))agg[c.id].tmax.push(tmax);
+      raw.push({lat, lon, rain, tmin, tmax});
+    }
+    const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
+    const nd={};
+    COUNTIES.forEach(c=>{
+      const a=agg[c.id];
+      nd[c.id]={
+        rain:Math.round((avg(a.rain)??BASE[c.id].rain)*10)/10,
+        tmin:Math.round((avg(a.tmin)??BASE[c.id].tmin)*10)/10,
+        tmax:Math.round((avg(a.tmax)??BASE[c.id].tmax)*10)/10,
+        wind:Math.round((avg(a.wind)??BASE[c.id].wind)*10)/10,
+        wind_dir:Math.round((avg(a.wind_dir)??BASE[c.id].wind_dir)*10)/10
+      };
+    });
+    onDone(nd,n,file.name,raw);
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════
+// MAIN
+// ═══════════════════════════════════════════
+const map=L.map('map',{center:[-0.5,37.9],zoom:6,zoomControl:true});
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap contributors'
+}).addTo(map);
+
+let activeMetric='rain';
+let currentWeek=WEEKS.length-1;
+let cdata=genCData(WEEKS[currentWeek].seed);
+prevCdata=currentWeek>0?genCData(WEEKS[currentWeek-1].seed):null;
+let rawCsvData=null;
+const layerVis={heat:true,county:true,school:true,wind:false};
+
+// Build modules
+CountyChoroModule.build(map);
+HeatmapModule.build(map);
+
+// Dedicated Wind Layer
+const WindModule = HeatmapModule; // Reusing the logic but with a different instance
+const windHeatmap = L.heatLayer([], {radius:40, blur:25, gradient:{0.4:'#b2ebf2', 0.7:'#4dd0e1', 1.0:'#006064'}});
+
+function refresh(){
+  CountyChoroModule.update(cdata,activeMetric);
+  HeatmapModule.update(cdata,activeMetric,rawCsvData);
+  const windPoints = WindModule.genIDWPoints(cdata, 'wind', 10, rawCsvData);
+  windHeatmap.setLatLngs(windPoints);
+  CountyChoroModule.setVisible(layerVis.heat);
+  HeatmapModule.setVisible(layerVis.heat);
+  updateLegend();updateStats();updateZoomLabel();updateDashboard();
+}
+
+BorderModule.build(map,layerVis.county);
+SchoolModule.build(map,layerVis.school);
+
+// Week selector
+const ws=document.getElementById('weekSel');
+WEEKS.forEach((w,i)=>{
+  const o=document.createElement('option');o.value=i;o.textContent=w.label;
+  if(i===WEEKS.length-1)o.selected=true;ws.appendChild(o);
+});
+ws.addEventListener('change',e=>{
+  const idx=+e.target.value;
+  prevCdata=idx>0?genCData(WEEKS[idx-1].seed):null;
+  currentWeek=idx;
+  cdata=genCData(WEEKS[idx].seed);
+  rawCsvData=null; // Reset raw data when switching back to simulated weeks
+  document.getElementById('sourceIndicator').dataset.mode = '';
+  refresh();
+  SchoolModule.recolorMarkers();
+});
+
+// Metric buttons
+document.querySelectorAll('.metric-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.metric-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');activeMetric=btn.dataset.m;refresh();
+  });
+});
+
+// API Sync Button
+document.getElementById('apiSyncBtn').addEventListener('click', fetchLiveAPI);
+
+// Layer toggles
+document.getElementById('togHeat').addEventListener('change',e=>{layerVis.heat=e.target.checked;CountyChoroModule.setVisible(e.target.checked);HeatmapModule.setVisible(e.target.checked);});
+document.getElementById('togCounty').addEventListener('change',e=>{layerVis.county=e.target.checked;BorderModule.setVisible(map,e.target.checked);});
+document.getElementById('togWindLayer').addEventListener('change',e=>{layerVis.wind=e.target.checked; e.target.checked ? windHeatmap.addTo(map) : windHeatmap.remove();});
+document.getElementById('togSchool').addEventListener('change',e=>{layerVis.school=e.target.checked;SchoolModule.setVisible(map,e.target.checked);});
+
+// Search implementation
+document.getElementById('mapSearch').addEventListener('keypress', e => {
+  if(e.key === 'Enter') {
+    const val = e.target.value;
+    const found = SchoolModule.findAndZoom(val);
+    if(!found) { alert('No matching school found.'); }
+  }
+});
+
+// Hover card
+map.on('mousemove',e=>{
+  const{lat,lng}=e.latlng;
+  const{c,d2}=nearest(lat,lng);
+  if(d2<2.5)fillCard(c.name+' County',c.id);else hideCard();
+});
+map.on('mouseout',hideCard);
+map.on('zoomend',updateZoomLabel);
+
+// CSV upload
+document.getElementById('csvIn').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  loadCSV(file,(nd,n,name,raw)=>{
+    prevCdata={...cdata};cdata=nd;rawCsvData=raw;refresh();
+    SchoolModule.recolorMarkers();
+    const st=document.getElementById('csvStatus');
+    st.textContent=`✓ ${n.toLocaleString()} points loaded from ${name}`;
+    st.style.display='block';setTimeout(()=>st.style.display='none',4000);
+  });
+  e.target.value='';
+});
+
+// Initial render with delay to allow GeoJSON to start loading
+setTimeout(()=>{map.invalidateSize();refresh();updateDashboard();},50);
+</script>

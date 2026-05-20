@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kenya Schools KMet Forecast Map</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons@latest/iconfont/tabler-icons.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Lato:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+<div class="login-overlay" id="loginOverlay">
+  <form class="login-panel" id="loginForm">
+    <h1>Kenya schools + KMet forecast</h1>
+    <label for="roleSel">Role</label>
+    <select id="roleSel">
+      <option value="NATIONAL_ADMIN">National admin</option>
+      <option value="COUNTY_OFFICER">County officer</option>
+    </select>
+    <label for="countySel">County</label>
+    <select id="countySel"></select>
+    <button type="submit" class="upload-btn">Open dashboard</button>
+  </form>
+</div>
+<h2 class="sr-only">Interactive Kenya KMet rainfall, temperature, and schools forecast map</h2>
+<div class="app">
+
+  <!-- ── DASHBOARD CALLOUT BAR ── -->
+  <div class="dash" id="dashBar">
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-high)"></div>
+      <div>
+        <div class="dash-label">High Risk Schools</div>
+        <div class="dash-count" id="dHigh">–</div>
+        <div class="dash-sub">Heavy / Very Heavy rain</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dHighTrend">–</div>
+    </div>
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-med)"></div>
+      <div>
+        <div class="dash-label">Moderate Risk</div>
+        <div class="dash-count" id="dMed">–</div>
+        <div class="dash-sub">Moderate rain (30–100 mm)</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dMedTrend">–</div>
+    </div>
+    <div class="dash-cell">
+      <div class="dash-dot" style="background:var(--risk-low)"></div>
+      <div>
+        <div class="dash-label">Low Risk Schools</div>
+        <div class="dash-count" id="dLow">–</div>
+        <div class="dash-sub">Light / No rain</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dLowTrend">–</div>
+    </div>
+    <div class="dash-cell" style="flex:0.8">
+      <div>
+        <div class="dash-label">Nat'l Avg Rainfall</div>
+        <div class="dash-count" id="dAvgR" style="font-size:18px">–</div>
+        <div class="dash-sub">mm this week</div>
+      </div>
+      <div class="dash-trend dash-eq" id="dAvgTrend">–</div>
+    </div>
+  </div>
+
+  <!-- ── HEADER ── -->
+  <div class="hdr">
+    <i class="ti ti-cloud-rain" aria-hidden="true" style="font-size:18px;color:var(--color-text-info)"></i>
+    <span class="hdr-title">Kenya schools + KMet forecast</span>
+    <span class="hdr-pill" id="sourceIndicator" style="background:var(--status-sim);color:#fff">Simulated</span>
+    <div class="hdr-spacer"></div>
+    <div class="hdr-right">
+      <div class="search-wrap">
+        <i class="ti ti-search"></i>
+        <input type="text" id="mapSearch" placeholder="Find a school or county..."/>
+      </div>
+      <button class="upload-btn" id="apiSyncBtn" style="background:var(--color-background-info);color:var(--color-text-info)">
+        <i class="ti ti-refresh" aria-hidden="true" style="font-size:14px"></i> Sync Wind API
+      </button>
+      <label for="weekSel"><i class="ti ti-calendar" aria-hidden="true" style="font-size:14px"></i> Forecast week</label>
+      <select id="weekSel"></select>
+      <input type="file" id="csvIn" accept=".csv" style="display:none" aria-label="Load KMet CSV"/>
+      <button class="upload-btn" onclick="document.getElementById('csvIn').click()">
+        <i class="ti ti-upload" aria-hidden="true" style="font-size:14px"></i> Load CSV
+      </button>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="sidebar">
+
+      <div class="sb-block">
+        <div class="sb-head">Active layer</div>
+        <div style="display:flex;flex-direction:column;gap:3px">
+          <button class="metric-btn active" data-m="rain"><span class="metric-dot" style="background:#2196f3"></span>7-day rainfall</button>
+          <button class="metric-btn" data-m="tmin"><span class="metric-dot" style="background:#1d9e75"></span>Min temperature</button>
+          <button class="metric-btn" data-m="tmax"><span class="metric-dot" style="background:#d85a30"></span>Max temperature</button>
+          <button class="metric-btn" data-m="wind"><span class="metric-dot" style="background:#673ab7"></span>Wind speed</button>
+        </div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">Map layers</div>
+        <div class="ltog"><input type="checkbox" id="togHeat" checked/><label for="togHeat"><i class="ti ti-ripple" style="font-size:13px"></i> Choropleth fill</label></div>
+        <div class="ltog"><input type="checkbox" id="togCounty" checked/><label for="togCounty"><i class="ti ti-map-2" style="font-size:13px"></i> County labels</label></div>
+        <div class="ltog"><input type="checkbox" id="togWindLayer"/><label for="togWindLayer"><i class="ti ti-wind" style="font-size:13px"></i> Wind arrows</label></div>
+        <div class="ltog"><input type="checkbox" id="togSchool" checked/><label for="togSchool"><i class="ti ti-building" style="font-size:13px"></i> Schools</label></div>
+      </div>
+
+
+      <div class="sb-block">
+        <div class="sb-head">Legend</div>
+        <div id="legItems"></div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">School risk</div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-high);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">High — Heavy rain</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-med);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Moderate rain</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:var(--risk-low);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Low — Light/None</span></div>
+        <div class="leg-row"><div class="leg-sw" style="background:rgba(229,57,53,.35);border-radius:50%;width:9px;height:9px"></div><span class="leg-lbl">Cluster — zoom in</span></div>
+      </div>
+
+      <div class="sb-block" style="flex:1">
+        <div class="sb-head">Week summary</div>
+        <div class="stat-row"><span class="stat-k">Total schools</span><span class="stat-v" id="stSch">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg rainfall</span><span class="stat-v" id="stAvR">–</span></div>
+        <div class="stat-row"><span class="stat-k">Max rainfall</span><span class="stat-v" id="stMxR">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg Tmax</span><span class="stat-v" id="stTmx">–</span></div>
+        <div class="stat-row"><span class="stat-k">Avg Wind</span><span class="stat-v" id="stWnd">–</span></div>
+        <div class="stat-row"><span class="stat-k" style="color:#ffcdd2">High-risk schools</span><span class="stat-v" id="stRsk" style="color:#ffcdd2">–</span></div>
+      </div>
+
+      <div class="sb-block">
+        <div class="sb-head">Zoom guide</div>
+        <div style="font-size:10px;line-height:1.9">
+          z5–7 &nbsp;National fill<br>
+          z8–11 &nbsp;Fill + clusters<br>
+          z12+ &nbsp;Individual schools
+        </div>
+      </div>
+    </div>
+
+    <div class="map-wrap">
+      <div id="map"></div>
+      <div class="zoom-lbl" id="zLbl">National view</div>
+      <div class="csv-status" id="csvStatus"></div>
+      <div class="hcard" id="hcard">
+        <div class="hc-name" id="hcName">Hover to inspect</div>
+        <div class="hc-grid">
+          <span class="hc-k">7-day rain</span><span class="hc-v" id="hcR">–</span><span class="hc-trend" id="hcRt">–</span>
+          <span class="hc-k">Category</span><span class="hc-v" id="hcC">–</span><span></span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Tmin</span><span class="hc-v" id="hcTn">–</span><span class="hc-trend" id="hcTnt">–</span>
+          <span class="hc-k">Tmax</span><span class="hc-v" id="hcTx">–</span><span class="hc-trend" id="hcTxt">–</span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Wind Spd</span><span class="hc-v" id="hcW">–</span><span class="hc-trend" id="hcWt">–</span>
+          <div class="hc-divider"></div>
+          <span class="hc-k">Schools</span><span class="hc-v" id="hcS">–</span><span></span>
+        </div>
+        <div id="hcBadge"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ops-panel">
+    <div class="source-grid">
+      <div class="source-item"><span>Rain / Temp</span><strong id="rainSource">Waiting for CSV</strong></div>
+      <div class="source-item"><span>Wind</span><strong id="windSource">Waiting for API</strong></div>
+      <div class="source-item"><span>Forecast points</span><strong id="pointCount">0</strong></div>
+      <div class="source-item"><span>Last update</span><strong id="lastSync">Not synced</strong></div>
+    </div>
+    <div class="panel-actions">
+      <button class="upload-btn" id="exportCountyBtn"><i class="ti ti-file-spreadsheet" aria-hidden="true"></i> County CSV</button>
+      <button class="upload-btn" id="exportSchoolsBtn"><i class="ti ti-file-alert" aria-hidden="true"></i> Affected Schools CSV</button>
+      <button class="upload-btn" id="printReportBtn"><i class="ti ti-printer" aria-hidden="true"></i> County Report</button>
+    </div>
+    <div class="risk-table-wrap">
+      <table class="risk-table">
+        <thead>
+          <tr><th>School</th><th>County</th><th>Risk</th><th>Rain</th><th>Wind</th><th>Reason</th></tr>
+        </thead>
+        <tbody id="riskTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-heat/0.2.0/leaflet-heat.min.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>

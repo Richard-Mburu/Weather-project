@@ -1,5 +1,7 @@
 // ═══════════════════════════════════════════
-// DATA
+// COUNTY DATA & SESSION MANAGEMENT
+// Static metadata for Kenya's 47 counties and session-based 
+// access control logic (National Admin vs County Officer).
 // ═══════════════════════════════════════════
 const COUNTIES=[
   {id:1,name:'Mombasa',lat:-4.05,lon:39.67,area:229},{id:2,name:'Kwale',lat:-4.18,lon:39.45,area:8270},
@@ -28,6 +30,10 @@ const COUNTIES=[
   {id:47,name:'Nairobi',lat:-1.29,lon:36.82,area:696}
 ];
 
+/**
+ * Session State: Manages user permissions and data scoping.
+ * 'NATIONAL_ADMIN' sees everything; 'COUNTY_OFFICER' is restricted to a specific countyId.
+ */
 let userSession={role:'NATIONAL_ADMIN',countyId:null};
 
 function isCountyMode(){return userSession.role==='COUNTY_OFFICER'&&userSession.countyId!==null;}
@@ -41,11 +47,14 @@ function filterCdataForScope(data){
   return scoped;
 }
 
+// BASE defines the climatological "normal" values for different regions of Kenya.
+// Used for simulation and as fallbacks when specific data points are missing.
 const BASE={};
 COUNTIES.forEach(c=>{
   let rain=22,tmin=17,tmax=29,wind=12,wind_dir=45;
   if(c.lon<35.5&&c.lat>-2){rain=115;tmin=12;tmax=23;}
-  else if(c.lat<-3.5||(c.lon>39&&c.lat<-1)){rain=70;tmin=22;tmax=32;}
+  else if(c.lat<-3.5||(c.lon>39&&c.lat<-1)){rain=70;tmin=22;tmax=32;} 
+  // ... additional regional weather logic ...
   else if(Math.abs(c.lat)<1.5&&c.lon>36&&c.lon<38.5){rain=80;tmin=13;tmax=25;}
   else if(c.lat>2){rain=8;tmin=20;tmax=36;}
   else if(c.lon>38&&c.lat>-1){rain=10;tmin=21;tmax=37;}
@@ -53,14 +62,17 @@ COUNTIES.forEach(c=>{
   BASE[c.id]={rain,tmin,tmax,wind,wind_dir};
 });
 
+// Seedable random number generator for deterministic simulations.
 function mkRng(s){let x=s*1664525+1013904223|0;return()=>{x=x*1664525+1013904223|0;return(x>>>0)/4294967296;};}
 
+// Defines the forecast periods (weeks) available in the system.
 const WEEKS=Array.from({length:8},(_,i)=>{
   const d=new Date('2026-03-10');d.setDate(d.getDate()+i*7);
   const e=new Date(d);e.setDate(e.getDate()+6);
   return{label:`${d.toLocaleDateString('en-KE',{day:'numeric',month:'short'})} – ${e.toLocaleDateString('en-KE',{day:'numeric',month:'short',year:'2-digit'})}`,seed:(i+1)*31337};
 });
 
+// Generates simulated county-level weather data based on geographic baselines.
 function genCData(seed){
   const r=mkRng(seed),res={};
   COUNTIES.forEach(c=>{
@@ -76,6 +88,7 @@ function genCData(seed){
   return res;
 }
 
+// GIS Utility: Finds the closest county to a given lat/lon point.
 function nearestCounty(lat,lon,counties=COUNTIES){
   let best=counties[0]||COUNTIES[0],bd=Infinity;
   counties.forEach(c=>{const d=(c.lat-lat)**2+(c.lon-lon)**2;if(d<bd){bd=d;best=c;}});
@@ -84,7 +97,8 @@ function nearestCounty(lat,lon,counties=COUNTIES){
 function nearest(lat,lon){return nearestCounty(lat,lon,COUNTIES);}
 
 // ═══════════════════════════════════════════
-// COLOUR SCHEMES — KMD palette
+// COLOUR SCHEMES
+// Maps weather values to colors, labels, and risk levels using KMD palettes.
 // ═══════════════════════════════════════════
 const SCHEMES={
   rain:{
@@ -150,6 +164,7 @@ const SCHEMES={
 // School marker colour by rainfall risk
 const RISK_COLORS={high:'#e53935',med:'#fb8c00',low:'#43a047'};
 
+// Global thresholds for high/medium risk alerts.
 const RISK_CONFIG = { rain: { high: 100, med: 30 }, wind: { high: 40, med: 25 } };
 const dataState = {
   rainSource: 'Waiting for CSV',
@@ -158,6 +173,12 @@ const dataState = {
   lastSync: 'Not synced'
 };
 
+const forecastDataCache=new Map();
+const analyticsCache=new Map();
+const MAX_RAW_POINTS=2500;
+let PRECOMPUTED_FORECASTS=null;
+
+// Colors used for the dynamic choropleth when multiple counties are selected.
 const DYNAMIC_CHOROPLETH_COLORS={
   rain:['#e8f4fd','#a8d8ea','#2196f3','#0d47a1','#4a148c'],
   tmin:['#3c3489','#1e88e5','#1d9e75','#f6c85f','#d85a30'],
@@ -165,10 +186,16 @@ const DYNAMIC_CHOROPLETH_COLORS={
   wind:['#e8f5e9','#81c784','#26a69a','#673ab7','#b71c1c']
 };
 
+// Maps metric keys to human-readable units.
 function metricUnit(metric){
   return {rain:'mm',tmin:'°C',tmax:'°C',wind:'km/h'}[metric] || '';
 }
 
+// Stats Helper: Calculates value breaks for map shading based on the current data range.
+/**
+ * Dynamic Breaks: Calculates Jenks-style natural breaks for choropleth shading
+ * based on the specific range of the currently loaded data.
+ */
 function getScopedMetricValues(metric){
   return activeCounties()
     .map(c=>cdata[c.id]&&Number(cdata[c.id][metric]))
@@ -189,9 +216,9 @@ function getDynamicBreaks(metric){
 
 function classifyChoropleth(metric,value){
   const dynamic=getDynamicBreaks(metric);
-  if(!dynamic||!Number.isFinite(value))return SCHEMES[metric].classify(value||0);
+  if(activeCounties().length<2||!dynamic||!Number.isFinite(value))return SCHEMES[metric].classify(value||0);
   const colors=DYNAMIC_CHOROPLETH_COLORS[metric]||DYNAMIC_CHOROPLETH_COLORS.rain;
-  if(Math.abs(dynamic.max-dynamic.min)<0.001)return {color:colors[2],label:`${value.toFixed(1)} ${metricUnit(metric)}`};
+  if(Math.abs(dynamic.max-dynamic.min)<0.001)return SCHEMES[metric].classify(value||0);
   const idx=Math.min(colors.length-1,Math.max(0,Math.floor(((value-dynamic.min)/(dynamic.max-dynamic.min))*colors.length)));
   return {color:colors[idx],label:`${value.toFixed(1)} ${metricUnit(metric)}`};
 }
@@ -199,7 +226,7 @@ function classifyChoropleth(metric,value){
 function getDynamicLegendItems(metric){
   const dynamic=getDynamicBreaks(metric);
   const colors=DYNAMIC_CHOROPLETH_COLORS[metric]||DYNAMIC_CHOROPLETH_COLORS.rain;
-  if(!dynamic||Math.abs(dynamic.max-dynamic.min)<0.001)return SCHEMES[metric].legend;
+  if(activeCounties().length<2||!dynamic||Math.abs(dynamic.max-dynamic.min)<0.001)return SCHEMES[metric].legend;
   return colors.map((color,i)=>{
     const a=dynamic.breaks[i],b=dynamic.breaks[i+1];
     return {color,label:`${a.toFixed(1)}-${b.toFixed(1)} ${metricUnit(metric)}`,desc:'Current selected period'};
@@ -220,14 +247,6 @@ function riskLabel(risk) {
 function getSchoolWeather(school, currentCData, rawPoints) {
   const countyData=currentCData[school.cid] || {};
   let rainVal = countyData.rain || 0;
-  // If we have high-resolution CSV points, use the nearest one instead of county avg
-  if (rawPoints && rawPoints.length > 0) {
-    let bestD = Infinity;
-    rawPoints.forEach(p => {
-      const d = (p.lat - school.lat)**2 + (p.lon - school.lon)**2;
-      if (d < bestD) { bestD = d; rainVal = p.rain; }
-    });
-  }
   return {
     rain: rainVal,
     tmin: countyData.tmin || 0,
@@ -237,6 +256,8 @@ function getSchoolWeather(school, currentCData, rawPoints) {
   };
 }
 
+// Core Risk Logic: Evaluates a school's environmental threat based on local rainfall
+// and wind speed compared against the RISK_CONFIG thresholds.
 function calculateSchoolRiskDetails(school, currentCData, rawPoints) {
   if(!currentCData[school.cid]) return {risk:'low',weather:getSchoolWeather(school,currentCData,rawPoints),reason:'No county data'};
   const weather=getSchoolWeather(school,currentCData,rawPoints);
@@ -253,6 +274,12 @@ function calculateSchoolRiskDetails(school, currentCData, rawPoints) {
 
 function calculateSchoolRisk(school, currentCData, rawPoints) {
   return calculateSchoolRiskDetails(school,currentCData,rawPoints).risk;
+}
+
+function normalizeName(n) {
+  if (!n) return "";
+  // Remove apostrophes, spaces, and lowercase for comparison
+  return n.toString().toLowerCase().replace(/['’\s-]/g, '').trim();
 }
 
 // ═══════════════════════════════════════════
@@ -275,8 +302,9 @@ const KENYA_RING=[
 ];
 
 // ═══════════════════════════════════════════
-// MODULE: COUNTY POLYGONS CHOROPLETH
-// Load actual county boundaries from GeoJSON
+// MODULE: COUNTY CHOROPLETH
+// Manages the base map layer for counties. 
+// Loads external GeoJSON for high-fidelity boundaries.
 // Falls back to centroid circles if GeoJSON fails
 // ═══════════════════════════════════════════
 const CountyChoroModule=(()=>{
@@ -319,23 +347,40 @@ const CountyChoroModule=(()=>{
     console.log('✓ Fallback choropleth (county circles) ready');
   }
   
+  function ensureChoroPane(map){
+    if(!map.getPane('choropleth')){
+      map.createPane('choropleth');
+      map.getPane('choropleth').style.zIndex = 450;
+      map.getPane('choropleth').style.pointerEvents = 'none';
+    }
+  }
+
   function build(map){
-    loadCountyGeoJSON().then(features=>{
-      if(features){
-        _geoLayer=L.geoJSON({type: "FeatureCollection", features: Object.values(features)},{
-          style:{color:'#111',weight:1.8,opacity:0.9,fillOpacity:0},
-          interactive:false
-        });
-        _geoLayer.addTo(map);
-        _geoLayer.bringToFront();
-        _ready=true;
-        _useFallback=false;
-        document.getElementById('zLbl').innerHTML += ' <span style="color:#4caf50">● High Fidelity</span>';
-      }else{
-        buildFallback(map);
-      }
-      if(typeof refresh === 'function') { refresh(); updateDashboard(); }
-    }).catch(() => { buildFallback(map); if(typeof refresh === 'function') refresh(); });
+    ensureChoroPane(map);
+    loadCountyGeoJSON()
+      .then(features=>{
+        if(features){
+          _geoLayer=L.geoJSON({type: "FeatureCollection", features: Object.values(features)},{
+            style:{color:'#111',weight:1.8,opacity:0.9,fillOpacity:0},
+            interactive:false,
+            pane:'choropleth'
+          });
+          _geoLayer.addTo(map);
+          _ready=true;
+          _useFallback=false;
+          document.getElementById('zLbl').innerHTML += ' <span style="color:#4caf50">● High Fidelity</span>';
+        }else{
+          buildFallback(map);
+        }
+      })
+      .catch(e => {
+        console.warn('CountyChoroModule build error:', e);
+        if(!_geoLayer)buildFallback(map);
+      })
+      .finally(() => {
+        try { if(typeof refresh === 'function') refresh(); }
+        catch(e) { console.warn('refresh after CountyChoroModule.build failed:', e); }
+      });
   }
   
   function update(cdata,metric){
@@ -344,56 +389,41 @@ const CountyChoroModule=(()=>{
     if(_useFallback){
       // Fallback: recolor circles by county
       _geoLayer.eachLayer(layer=>{
-        const latLng=layer.getLatLng();
+        const latLng=layer.getLatLng && layer.getLatLng();
         if(!latLng)return;
         const countyMatch=COUNTIES.find(c=>Math.abs(c.lat-latLng.lat)<0.1&&Math.abs(c.lon-latLng.lng)<0.1);
         if(!countyMatch)return;
-        if(!canAccessCounty(countyMatch.id)){layer.setStyle({fillOpacity:0,opacity:0});return;}
-        const metricVal=cdata[countyMatch.id][metric];
+        if(!canAccessCounty(countyMatch.id) || !cdata[countyMatch.id]){layer.setStyle({fillOpacity:0,opacity:0});return;}
+        const metricVal=cdata[countyMatch.id][metric] || 0;
         const{color}=classifyChoropleth(metric,metricVal);
-        layer.setStyle({fillColor:color,fillOpacity:0.82});
+        const isVisible = layerVis.heat && _ready;
+        layer.setStyle({fillColor:color,fillOpacity:isVisible?0.82:0, opacity: isVisible?0.7:0});
       });
     }else{
       // Recolor polygon layer
       _geoLayer.eachLayer(layer=>{
         if(!layer.feature)return;
-        // Use same property resolution logic as loadCountyGeoJSON
         const props = layer.feature.properties;
         const countyName = props.adm1_name || props.adm2_name || props.name;
+        const normName = normalizeName(countyName);
         
-        const countyMatch=COUNTIES.find(c=>c.name===countyName);
-        if(!countyMatch){
-          console.warn('No match for county:',countyName);
+        const countyMatch=COUNTIES.find(c=>normalizeName(c.name)===normName);
+        if(!countyMatch || !canAccessCounty(countyMatch.id) || !cdata[countyMatch.id]){
+          layer.setStyle({fillOpacity:0,opacity:0});
           return;
         }
-        if(!canAccessCounty(countyMatch.id)){layer.setStyle({fillOpacity:0,opacity:0});return;}
-        const metricVal=cdata[countyMatch.id][metric];
+        const metricVal=cdata[countyMatch.id][metric] || 0;
         const{color}=classifyChoropleth(metric,metricVal);
-        layer.setStyle({fillColor:color,fillOpacity:0.82,fill:true,opacity:0.9});
+        const isVisible = layerVis.heat && _ready;
+        layer.setStyle({fillColor:color,fillOpacity:isVisible?0.82:0,fill:true,opacity:isVisible?0.8:0});
       });
       if(_geoLayer.bringToFront)_geoLayer.bringToFront();
     }
   }
   
   function setVisible(v){
-    if(!_geoLayer) return;
-    const op = v && _ready ? 0.82 : 0;
-    // Safe check: LayerGroups (fallback) don't have setStyle, but GeoJSON layers do
-    if(_geoLayer.setStyle) {
-      _geoLayer.eachLayer(layer=>{
-        const props=layer.feature&&layer.feature.properties;
-        const countyName=props&&(props.adm1_name || props.adm2_name || props.name);
-        const countyMatch=COUNTIES.find(c=>c.name===countyName);
-        layer.setStyle({fillOpacity:countyMatch&&canAccessCounty(countyMatch.id)?op:0,opacity:countyMatch&&canAccessCounty(countyMatch.id)?0.8:0});
-      });
-    } else {
-      _geoLayer.eachLayer(l => {
-        if(!l.setStyle)return;
-        const latLng=l.getLatLng&&l.getLatLng();
-        const countyMatch=latLng?COUNTIES.find(c=>Math.abs(c.lat-latLng.lat)<0.1&&Math.abs(c.lon-latLng.lng)<0.1):null;
-        l.setStyle({fillOpacity:countyMatch&&canAccessCounty(countyMatch.id)?op:0,opacity:countyMatch&&canAccessCounty(countyMatch.id)?0.7:0});
-      });
-    }
+    if(!_geoLayer)return;
+    update(cdata, activeMetric);
   }
   
   return{build,update,setVisible};
@@ -403,6 +433,103 @@ const CountyChoroModule=(()=>{
 // MODULE: HEATMAP (fallback: IDW grid)
 // For demo, generates interpolated points from counties
 // For production, feed real KMet CSV grid points
+// ═══════════════════════════════════════════
+const SubcountyModule=(()=>{
+  let _geoLayer=null;
+  let _features=[];
+  let _ready=false;
+  let _map=null;
+
+  function ensurePane(map){
+    if(!map.getPane('subcounties')){
+      map.createPane('subcounties');
+      map.getPane('subcounties').style.zIndex=470;
+      map.getPane('subcounties').style.pointerEvents='none';
+    }
+  }
+
+  async function loadSubcounties(){
+    if(_features.length)return _features;
+    const resp=await fetch('data/ken_admin2.geojson');
+    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+    const geojson=await resp.json();
+    _features=geojson.features||[];
+    return _features;
+  }
+
+  function selectedFeatures(){
+    const county=selectedCounty();
+    if(!county)return [];
+    const countyName=normalizeName(county.name);
+    return _features.filter(feat=>normalizeName(feat.properties&&feat.properties.adm1_name)===countyName);
+  }
+
+  function rebuildLayer(){
+    if(!_map||!_ready)return;
+    if(_geoLayer){
+      _map.removeLayer(_geoLayer);
+      _geoLayer=null;
+    }
+    const feats=isCountyMode()?selectedFeatures():[];
+    if(!feats.length)return;
+    _geoLayer=L.geoJSON({type:'FeatureCollection',features:feats},{
+      style:{color:'#263238',weight:1.2,opacity:0.8,dashArray:'3 4',fillOpacity:0.08,fillColor:'#fff',fill:true},
+      interactive:false,
+      pane:'subcounties'
+    });
+    if(layerVis.heat)_geoLayer.addTo(_map);
+  }
+
+  function build(map){
+    _map=map;
+    ensurePane(map);
+    loadSubcounties()
+      .then(()=>{_ready=true;rebuildLayer();update(cdata,activeMetric);})
+      .catch(e=>console.warn('SubcountyModule build error:',e));
+  }
+
+  function update(data,metric){
+    if(!_ready)return;
+    if(!_geoLayer||!isCountyMode()){
+      rebuildLayer();
+      if(!_geoLayer)return;
+    }
+    const county=selectedCounty();
+    const row=county&&data[county.id];
+    const color=row?classifyChoropleth(metric,row[metric]||0).color:'#ffffff';
+    _geoLayer.eachLayer(layer=>layer.setStyle({
+      fillColor:color,
+      fillOpacity:layerVis.heat&&isCountyMode()?0.16:0,
+      opacity:layerVis.heat&&isCountyMode()?0.9:0
+    }));
+    if(_geoLayer.bringToFront)_geoLayer.bringToFront();
+  }
+
+  function setVisible(map,visible){
+    if(!_ready)return;
+    if(!_geoLayer)rebuildLayer();
+    if(!_geoLayer)return;
+    if(visible&&isCountyMode()){
+      if(!map.hasLayer(_geoLayer))_geoLayer.addTo(map);
+      update(cdata,activeMetric);
+    }else if(map.hasLayer(_geoLayer)){
+      map.removeLayer(_geoLayer);
+    }
+  }
+
+  function getBounds(){
+    if(!_geoLayer)return null;
+    const bounds=_geoLayer.getBounds();
+    return bounds&&bounds.isValid()?bounds:null;
+  }
+
+  return{build,update,setVisible,getBounds,rebuild:rebuildLayer};
+})();
+
+// ═══════════════════════════════════════════
+// MODULE: HEATMAP
+// Uses Inverse Distance Weighting (IDW) to interpolate weather values
+// across a continuous grid, creating a smooth visual gradient.
 // ═══════════════════════════════════════════
 const HeatmapModule=(()=>{
   let _heatLayer=null;
@@ -470,6 +597,10 @@ const HeatmapModule=(()=>{
   return{build,update,setVisible,genIDWPoints};
 })();
 
+// ═══════════════════════════════════════════
+// MODULE: WIND ARROWS
+// Renders dynamic arrows indicating wind speed (via size/color) and direction.
+// ═══════════════════════════════════════════
 const WindArrowModule=(()=>{
   let _lg=null;
 
@@ -542,6 +673,10 @@ const BorderModule=(()=>{
 
 // ═══════════════════════════════════════════
 // MODULE: SCHOOLS  (colour by rainfall risk)
+// Handles the distribution and clustering of school markers.
+// Handles the distribution and clustering of markers.
+// Schools are procedurally generated for the demo, but logic supports 
+// real coordinates. Markers change color dynamically based on weather data.
 // ═══════════════════════════════════════════
 const SCHOOLS=(()=>{
   const r=mkRng(54321),res=[];
@@ -583,6 +718,7 @@ const SchoolModule=(()=>{
       }
     });
 
+    // Populate clusters with school points
     activeSchools().forEach((s,idx)=>{
       const risk = calculateSchoolRisk(s, cdata, rawCsvData);
       const col=RISK_COLORS[risk];
@@ -662,7 +798,8 @@ function getTrendData(curr, prev, badIsUp = true) {
 }
 
 // ═══════════════════════════════════════════
-// HOVER CARD
+// UI: HOVER CARD
+// Updates the detailed side-panel when hovering over counties or schools.
 // ═══════════════════════════════════════════
 function fillCard(title,cid){
   const d=cdata[cid];
@@ -700,7 +837,8 @@ function fillCard(title,cid){
 function hideCard(){document.getElementById('hcard').classList.remove('show');}
 
 // ═══════════════════════════════════════════
-// DASHBOARD CALLOUT
+// UI: DASHBOARD UPDATES
+// Aggregates statistics for the top-level summary cards.
 // ═══════════════════════════════════════════
 function updateDashboard(){
   let high=0,med=0,low=0;
@@ -757,6 +895,10 @@ function showStatus(message,isError=false){
   setTimeout(()=>st.style.display='none',4500);
 }
 
+function setUiBusy(isBusy){
+  document.querySelectorAll('button,select,input').forEach(el=>{el.disabled=isBusy;});
+}
+
 function getAffectedSchools(){
   return activeSchools().map(s=>({school:s,details:calculateSchoolRiskDetails(s,cdata,rawCsvData)}))
     .filter(row=>row.details.risk!=='low')
@@ -785,6 +927,7 @@ function getCountySummaryRows(){
 function updateRiskTable(){
   const rows=getAffectedSchools().slice(0,80);
   const body=document.getElementById('riskTableBody');
+  if(!body)return;
   if(!rows.length){
     body.innerHTML='<tr><td colspan="6">No moderate or high risk schools for the current data.</td></tr>';
     return;
@@ -798,6 +941,216 @@ function updateRiskTable(){
       <td>${details.weather.wind.toFixed(1)} km/h</td>
       <td>${details.reason}</td>
     </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════
+// ANALYTICS & TRENDS
+// Handles historical data aggregation and chart rendering.
+// ═══════════════════════════════════════════
+function cacheKeyForForecast(forecast){
+  return `${userSession.role}:${userSession.countyId||'ALL'}:${forecast.file}`;
+}
+
+function parsedFromPrecomputed(forecast){
+  if(!PRECOMPUTED_FORECASTS)return null;
+  const period=PRECOMPUTED_FORECASTS.periods.find(p=>p.file===forecast.file);
+  if(!period)return null;
+  const data={};
+  let count=0;
+  activeCounties().forEach(c=>{
+    const row=period.counties[String(c.id)];
+    if(!row)return;
+    count+=row.point_count||0;
+    data[c.id]={
+      rain:row.rain,
+      tmin:row.tmin,
+      tmax:row.tmax,
+      wind:row.wind ?? BASE[c.id].wind,
+      wind_dir:row.wind_dir ?? BASE[c.id].wind_dir
+    };
+  });
+  return {data,count,name:forecast.file,raw:null,hasWind:false,hasWindDir:false};
+}
+
+async function loadForecastData(forecast){
+  const key=cacheKeyForForecast(forecast);
+  if(forecastDataCache.has(key))return forecastDataCache.get(key);
+  const precomputed=parsedFromPrecomputed(forecast);
+  if(precomputed){
+    forecastDataCache.set(key,precomputed);
+    return precomputed;
+  }
+  const resp=await fetch(`data/${forecast.file}`);
+  if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
+  const parsed=parseForecastCSV(await resp.text(),forecast.file);
+  forecastDataCache.set(key,parsed);
+  return parsed;
+}
+
+function getTrendCountySelection(){
+  const sel=document.getElementById('trendCountySel');
+  return sel?sel.value:'scope';
+}
+
+function getTrendMetricSelection(){
+  const sel=document.getElementById('trendMetricSel');
+  return sel?sel.value:'all';
+}
+
+function getTrendPeriodSelection(){
+  const sel=document.getElementById('trendPeriodSel');
+  return sel?sel.value:'yearly';
+}
+
+function getTrendYearSelection(){
+  const sel=document.getElementById('trendYearSel');
+  return sel?sel.value:'';
+}
+
+function getTrendCounties(){
+  const selected=getTrendCountySelection();
+  if(selected==='scope')return activeCounties();
+  const county=COUNTIES.find(c=>String(c.id)===selected);
+  if(county&&canAccessCounty(county.id))return [county];
+  return activeCounties();
+}
+
+function populateTrendControls(){
+  const countySel=document.getElementById('trendCountySel');
+  if(countySel){
+    const current=countySel.value||'scope';
+    countySel.innerHTML='';
+    const scopeOpt=document.createElement('option');
+    scopeOpt.value='scope';
+    scopeOpt.textContent=isCountyMode()?'Selected county':'All accessible counties';
+    countySel.appendChild(scopeOpt);
+    activeCounties().forEach(c=>{
+      const opt=document.createElement('option');
+      opt.value=c.id;
+      opt.textContent=c.name;
+      countySel.appendChild(opt);
+    });
+    countySel.value=[...countySel.options].some(o=>o.value===current)?current:'scope';
+    countySel.disabled=isCountyMode();
+  }
+
+  const yearSel=document.getElementById('trendYearSel');
+  if(yearSel){
+    const current=yearSel.value;
+    const years=[...new Set(FORECASTS.map(f=>(f.start||'').slice(0,4)).filter(Boolean))].sort();
+    yearSel.innerHTML='';
+    years.forEach(year=>{
+      const opt=document.createElement('option');
+      opt.value=year;
+      opt.textContent=year;
+      yearSel.appendChild(opt);
+    });
+    yearSel.value=years.includes(current)?current:(years[years.length-1]||'');
+    yearSel.disabled=getTrendPeriodSelection()==='yearly';
+  }
+}
+
+async function buildAnalyticsSeries(){
+  const trendCountyKey=getTrendCounties().map(c=>c.id).join(',');
+  const scopeKey=`${userSession.role}:${userSession.countyId||'ALL'}:${trendCountyKey}:raw:${FORECASTS.map(f=>f.file).join('|')}`;
+  if(analyticsCache.has(scopeKey))return analyticsCache.get(scopeKey);
+  const series=[];
+  for(const forecast of FORECASTS){
+    let parsed=null;
+    if(PRECOMPUTED_FORECASTS)parsed=parsedFromPrecomputed(forecast);
+    else {
+      const key=cacheKeyForForecast(forecast);
+      if(forecastDataCache.has(key))parsed=forecastDataCache.get(key);
+    }
+    if(!parsed)continue;
+    const allowed=new Set(getTrendCounties().map(c=>c.id));
+    const vals=Object.entries(parsed.data).filter(([cid])=>allowed.has(Number(cid))).map(([,row])=>row);
+    const avg=metric=>vals.length?vals.reduce((sum,v)=>sum+(Number(v[metric])||0),0)/vals.length:0;
+    series.push({
+      label:forecast.label,
+      file:forecast.file,
+      start:forecast.start,
+      end:forecast.end,
+      year:(forecast.start||'').slice(0,4),
+      month:(forecast.start||'').slice(4,6),
+      rain:avg('rain'),
+      tmin:avg('tmin'),
+      tmax:avg('tmax'),
+      wind:avg('wind')
+    });
+  }
+  analyticsCache.set(scopeKey,series);
+  return series;
+}
+
+function monthLabel(month){
+  const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const idx=Number(month)-1;
+  return names[idx]||month||'';
+}
+
+function aggregateAnalyticsSeries(series){
+  const period=getTrendPeriodSelection();
+  const selectedYear=getTrendYearSelection();
+  const rows=period==='monthly'?series.filter(row=>row.year===selectedYear):series;
+  const groups=new Map();
+  rows.forEach(row=>{
+    const key=period==='monthly'?`${row.year}-${row.month}`:row.year;
+    if(!key||key==='-')return;
+    if(!groups.has(key))groups.set(key,{key,label:period==='monthly'?monthLabel(row.month):key,count:0,rain:0,tmin:0,tmax:0,wind:0});
+    const group=groups.get(key);
+    group.count+=1;
+    ['rain','tmin','tmax','wind'].forEach(metric=>{group[metric]+=Number(row[metric])||0;});
+  });
+  return [...groups.values()].sort((a,b)=>a.key.localeCompare(b.key)).map(group=>{
+    ['rain','tmin','tmax','wind'].forEach(metric=>{group[metric]=group.count?group[metric]/group.count:0;});
+    return group;
+  });
+}
+
+function renderMiniBars(id,series,metric,unit,color){
+  const el=document.getElementById(id);
+  if(!el)return;
+  const vals=series.map(row=>row[metric]);
+  const max=Math.max(...vals,0.001);
+  const points=series.map((row,idx)=>{
+    const x=series.length===1?50:(idx/(series.length-1))*100;
+    const y=100-((row[metric]/max)*88+6);
+    return `${x.toFixed(2)},${Math.max(4,Math.min(96,y)).toFixed(2)}`;
+  }).join(' ');
+  const bars=series.map(row=>{
+    const h=Math.max(6,(row[metric]/max)*78);
+    return `<div class="mini-bar" style="height:${h}px;background:${color}" data-tip="${row.label}: ${row[metric].toFixed(1)} ${unit}"></div>`;
+  }).join('');
+  const axis=series.length>1
+    ? `<span>${series[0].label}</span><span>${series[series.length-1].label}</span>`
+    : `<span>${series[0]?.label||''}</span>`;
+  el.classList.add('trend-chart');
+  el.innerHTML=`<div class="trend-plot"><div class="mini-bars">${bars}</div><svg class="trend-line" viewBox="0 0 100 100" preserveAspectRatio="none"><polyline points="${points}" fill="none" stroke="#fff" stroke-width="5" opacity="0.45" vector-effect="non-scaling-stroke"/><polyline points="${points}" fill="none" stroke="${color}" stroke-width="2.5" vector-effect="non-scaling-stroke"/></svg></div><div class="trend-axis">${axis}</div>`;
+}
+
+async function updateAnalytics(){
+  populateTrendControls();
+  const trendCounties=getTrendCounties();
+  const scopeEl=document.getElementById('analyticsScope');
+  if(scopeEl)scopeEl.textContent=trendCounties.length===1?`${trendCounties[0].name} County`:'All accessible counties';
+  try{
+    const series=await buildAnalyticsSeries();
+    if(!series.length)return;
+    const displaySeries=aggregateAnalyticsSeries(series);
+    if(!displaySeries.length)return;
+    const selectedMetric=getTrendMetricSelection();
+    ['rain','tmin','tmax','wind'].forEach(metric=>{
+      const ids={rain:'rainTrend',tmin:'tminTrend',tmax:'tmaxTrend',wind:'windTrend'};
+      const units={rain:'mm',tmin:'C',tmax:'C',wind:'km/h'};
+      const colors={rain:'#2196f3',tmin:'#1d9e75',tmax:'#d85a30',wind:'#673ab7'};
+      const card=document.getElementById(ids[metric])?.closest('.analytics-card');
+      if(card)card.style.display=(selectedMetric==='all'||selectedMetric===metric)?'block':'none';
+      renderMiniBars(ids[metric],displaySeries,metric,units[metric],colors[metric]);
+    });
+  }catch(e){
+    console.warn('Analytics update failed:',e);
+  }
 }
 
 function csvEscape(value){
@@ -896,7 +1249,9 @@ function updateZoomLabel(){
 }
 
 // ═══════════════════════════════════════════
-// LIVE API INTEGRATION (Open-Meteo)
+// EXTERNAL INTEGRATIONS
+// 1. LIVE API: Fetches real-time wind/temp from Open-Meteo.
+// 2. CSV LOADER: Parses KMet weather forecast files with fuzzy header matching.
 // ═══════════════════════════════════════════
 async function fetchOpenMeteoDaily() {
   const counties=activeCounties();
@@ -949,6 +1304,10 @@ function findHeader(headers, names) {
   return headers.findIndex(h => names.includes(h.replace(/[\s_-]+/g, '')));
 }
 
+/**
+ * Fuzzy CSV Parser:
+ * Automatically detects latitude, longitude, and weather metrics regardless of header names.
+ */
 function parseForecastCSV(text, name='forecast.csv') {
   const lines=text.trim().split(/\r?\n/);
   const sep=lines[0].includes('\t')?'\t':',';
@@ -984,7 +1343,7 @@ function parseForecastCSV(text, name='forecast.csv') {
     if(!isNaN(tmax))agg[c.id].tmax.push(tmax);
     if(!isNaN(wind))agg[c.id].wind.push(wind);
     if(!isNaN(windDir))agg[c.id].wind_dir.push(windDir);
-    raw.push({lat,lon,rain,tmin,tmax,wind,wind_dir:windDir});
+    if(raw.length<MAX_RAW_POINTS || i % 50 === 0)raw.push({lat,lon,rain,tmin,tmax,wind,wind_dir:windDir});
   }
 
   const avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
@@ -1021,7 +1380,10 @@ function loadCSV(file,onDone){
   const reader=new FileReader();
   reader.onload=ev=>{
     try {
-      onDone(parseForecastCSV(ev.target.result,file.name));
+      const parsed=parseForecastCSV(ev.target.result,file.name);
+      forecastDataCache.set(`${userSession.role}:${userSession.countyId||'ALL'}:${file.name}`,parsed);
+      analyticsCache.clear();
+      onDone(parsed);
     } catch(e) {
       alert(e.message);
     }
@@ -1032,9 +1394,7 @@ function loadCSV(file,onDone){
 async function loadDefaultForecastCSV(){
   try{
     const forecast=FORECASTS[currentWeek]||FORECASTS[FORECASTS.length-1];
-    const resp=await fetch(`data/${forecast.file}`);
-    if(!resp.ok)throw new Error(`HTTP ${resp.status}`);
-    const parsed=parseForecastCSV(await resp.text(),forecast.file);
+    const parsed=await loadForecastData(forecast);
     applyForecastData(parsed);
     const st=document.getElementById('csvStatus');
     st.textContent=`✓ ${parsed.count.toLocaleString()} forecast points loaded from ${parsed.name}`;
@@ -1046,18 +1406,25 @@ async function loadDefaultForecastCSV(){
 }
 
 async function loadSelectedForecastCSV(){
-  cdata=genCData(FORECASTS[currentWeek].seed);
-  prevCdata=currentWeek>0?genCData(FORECASTS[currentWeek-1].seed):null;
-  if(isCountyMode()){
-    cdata=filterCdataForScope(cdata);
-    prevCdata=prevCdata?filterCdataForScope(prevCdata):null;
+  showStatus('Loading selected forecast...');
+  setUiBusy(true);
+  try{
+    cdata=genCData(FORECASTS[currentWeek].seed);
+    prevCdata=currentWeek>0?genCData(FORECASTS[currentWeek-1].seed):null;
+    if(isCountyMode()){
+      cdata=filterCdataForScope(cdata);
+      prevCdata=prevCdata?filterCdataForScope(prevCdata):null;
+    }
+    rawCsvData=null;
+    document.getElementById('sourceIndicator').dataset.mode='';
+    refresh();
+    SchoolModule.recolorMarkers();
+    await loadDefaultForecastCSV();
+    await updateAnalytics();
+    if(isCountyMode())fitSelectedCounty();
+  }finally{
+    setUiBusy(false);
   }
-  rawCsvData=null;
-  document.getElementById('sourceIndicator').dataset.mode='';
-  refresh();
-  SchoolModule.recolorMarkers();
-  await loadDefaultForecastCSV();
-  if(isCountyMode())fitSelectedCounty();
 }
 
 function parseForecastDate(value){
@@ -1099,6 +1466,18 @@ async function discoverForecastFiles(){
 
 async function loadForecastManifest(){
   try{
+    const resp=await fetch('data/forecast_county_data.json');
+    if(resp.ok){
+      PRECOMPUTED_FORECASTS=await resp.json();
+      FORECASTS=PRECOMPUTED_FORECASTS.periods
+        .map((f,i)=>({...f,label:formatForecastLabel(f.start,f.end),seed:(i+1)*31337}))
+        .sort((a,b)=>a.start.localeCompare(b.start));
+      return;
+    }
+  }catch(e){
+    console.warn('Precomputed forecast data unavailable:',e);
+  }
+  try{
     const files=await discoverForecastFiles();
     FORECASTS=files
       .map((f,i)=>({...f,label:formatForecastLabel(f.start,f.end),seed:(i+1)*31337}))
@@ -1135,17 +1514,24 @@ const layerVis={heat:true,county:true,school:true,wind:false};
 
 // Build modules
 CountyChoroModule.build(map);
+SubcountyModule.build(map);
 HeatmapModule.build(map);
 WindArrowModule.build(map);
 
 function fitSelectedCounty(){
   const c=selectedCounty();
   if(!c)return;
+  const admin2Bounds=SubcountyModule.getBounds();
+  if(admin2Bounds){
+    map.fitBounds(admin2Bounds,{padding:[28,28],maxZoom:10});
+    return;
+  }
   const pad=Math.max(0.35,Math.min(1.25,Math.sqrt(c.area)/130));
   map.fitBounds([[c.lat-pad,c.lon-pad],[c.lat+pad,c.lon+pad]],{padding:[28,28],maxZoom:10});
 }
 
 function rebuildScopedLayers(){
+  SubcountyModule.rebuild();
   BorderModule.build(map,layerVis.county);
   SchoolModule.build(map,layerVis.school);
   refresh();
@@ -1163,6 +1549,7 @@ async function loadNationalView(){
   map.setView([-0.5,37.9],6);
   rebuildScopedLayers();
   await loadDefaultForecastCSV();
+  await updateAnalytics();
 }
 
 async function loadCountyView(countyId){
@@ -1177,17 +1564,20 @@ async function loadCountyView(countyId){
   rebuildScopedLayers();
   fitSelectedCounty();
   await loadDefaultForecastCSV();
+  await updateAnalytics();
   fitSelectedCounty();
 }
 
 function refresh(){
   CountyChoroModule.update(cdata,activeMetric);
+  SubcountyModule.update(cdata,activeMetric);
   HeatmapModule.update(cdata,activeMetric,rawCsvData);
   WindArrowModule.update(cdata);
   CountyChoroModule.setVisible(layerVis.heat);
+  SubcountyModule.setVisible(map,layerVis.heat);
   HeatmapModule.setVisible(layerVis.heat);
   WindArrowModule.setVisible(map,layerVis.wind);
-  updateLegend();updateStats();updateZoomLabel();updateDashboard();updateDataPanel();updateRiskTable();
+  updateLegend();updateStats();updateZoomLabel();updateDashboard();updateDataPanel();
 }
 
 BorderModule.build(map,layerVis.county);
@@ -1222,10 +1612,14 @@ document.getElementById('exportSchoolsBtn').addEventListener('click', exportAffe
 document.getElementById('printReportBtn').addEventListener('click', printCountyReport);
 
 // Layer toggles
-document.getElementById('togHeat').addEventListener('change',e=>{layerVis.heat=e.target.checked;CountyChoroModule.setVisible(e.target.checked);HeatmapModule.setVisible(e.target.checked);});
+document.getElementById('togHeat').addEventListener('change',e=>{layerVis.heat=e.target.checked;CountyChoroModule.setVisible(e.target.checked);SubcountyModule.setVisible(map,e.target.checked);HeatmapModule.setVisible(e.target.checked);});
 document.getElementById('togCounty').addEventListener('change',e=>{layerVis.county=e.target.checked;BorderModule.setVisible(map,e.target.checked);});
 document.getElementById('togWindLayer').addEventListener('change',e=>{layerVis.wind=e.target.checked;WindArrowModule.setVisible(map,e.target.checked);});
 document.getElementById('togSchool').addEventListener('change',e=>{layerVis.school=e.target.checked;SchoolModule.setVisible(map,e.target.checked);});
+document.getElementById('trendCountySel')?.addEventListener('change',()=>{analyticsCache.clear();updateAnalytics();});
+document.getElementById('trendPeriodSel')?.addEventListener('change',updateAnalytics);
+document.getElementById('trendYearSel')?.addEventListener('change',updateAnalytics);
+document.getElementById('trendMetricSel')?.addEventListener('change',updateAnalytics);
 
 // Search implementation
 document.getElementById('mapSearch').addEventListener('keypress', e => {
@@ -1251,6 +1645,7 @@ document.getElementById('csvIn').addEventListener('change',e=>{
   loadCSV(file,async(parsed)=>{
     applyForecastData(parsed);
     if(!parsed.hasWind)await fetchLiveWindAPI();
+    await updateAnalytics();
     const st=document.getElementById('csvStatus');
     st.textContent=`✓ ${parsed.count.toLocaleString()} points loaded from ${parsed.name}`;
     st.style.display='block';setTimeout(()=>st.style.display='none',4000);
@@ -1271,6 +1666,12 @@ function initLogin(){
   }
   roleSel.addEventListener('change',syncCountyControl);
   syncCountyControl();
+  document.getElementById('switchAccountBtn')?.addEventListener('click',()=>{
+    roleSel.value=userSession.role;
+    countySel.value=userSession.countyId||COUNTIES[0].id;
+    syncCountyControl();
+    document.getElementById('loginOverlay').classList.remove('hidden');
+  });
   form.addEventListener('submit',async e=>{
     e.preventDefault();
     document.getElementById('loginOverlay').classList.add('hidden');

@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell($j = Get-Content 'data/ken_admin1.geojson' -Raw | ConvertFrom-Json; $j.features | ForEach-Object { $_.properties.adm1_name } | Sort-Object)"
+    ]
+  }
+}

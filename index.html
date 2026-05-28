@@ -65,7 +65,7 @@
         <div class="dash-count" id="dAvgR" style="font-size:18px">–</div>
         <div class="dash-sub">mm this week</div>
       </div>
-      <div class="dash-trend dash-eq" id="dAvgTrend">–</div>
+      <div class="dash-trend dash-eq" id="dAvgRTrend">–</div>
     </div>
   </div>
 
@@ -88,6 +88,9 @@
       <input type="file" id="csvIn" accept=".csv" style="display:none" aria-label="Load KMet CSV"/>
       <button class="upload-btn" onclick="document.getElementById('csvIn').click()">
         <i class="ti ti-upload" aria-hidden="true" style="font-size:14px"></i> Load CSV
+      </button>
+      <button class="upload-btn" id="switchAccountBtn" type="button">
+        <i class="ti ti-user-switch" aria-hidden="true" style="font-size:14px"></i> Switch
       </button>
     </div>
   </div>
@@ -181,13 +184,32 @@
       <button class="upload-btn" id="exportSchoolsBtn"><i class="ti ti-file-alert" aria-hidden="true"></i> Affected Schools CSV</button>
       <button class="upload-btn" id="printReportBtn"><i class="ti ti-printer" aria-hidden="true"></i> County Report</button>
     </div>
-    <div class="risk-table-wrap">
-      <table class="risk-table">
-        <thead>
-          <tr><th>School</th><th>County</th><th>Risk</th><th>Rain</th><th>Wind</th><th>Reason</th></tr>
-        </thead>
-        <tbody id="riskTableBody"></tbody>
-      </table>
+    <div class="analytics-wrap">
+      <div class="analytics-head">
+        <span>Weather overtime analytics</span>
+        <div class="analytics-controls">
+          <select id="trendCountySel" aria-label="Trend county"></select>
+          <select id="trendPeriodSel" aria-label="Trend period">
+            <option value="yearly">Yearly</option>
+            <option value="monthly">Monthly</option>
+          </select>
+          <select id="trendYearSel" aria-label="Trend year"></select>
+          <select id="trendMetricSel" aria-label="Trend metric">
+            <option value="all">All metrics</option>
+            <option value="rain">Rainfall</option>
+            <option value="tmin">Min temp</option>
+            <option value="tmax">Max temp</option>
+            <option value="wind">Wind</option>
+          </select>
+          <strong id="analyticsScope">All accessible counties</strong>
+        </div>
+      </div>
+      <div class="analytics-grid">
+        <div class="analytics-card"><span>Rainfall trend</span><div id="rainTrend" class="mini-bars"></div></div>
+        <div class="analytics-card"><span>Min temp trend</span><div id="tminTrend" class="mini-bars"></div></div>
+        <div class="analytics-card"><span>Max temp trend</span><div id="tmaxTrend" class="mini-bars"></div></div>
+        <div class="analytics-card"><span>Wind trend</span><div id="windTrend" class="mini-bars"></div></div>
+      </div>
     </div>
   </div>
 </div>

@@ -19,3 +19,13 @@ python -m http.server 8000
 ```
 
 Then open `http://localhost:8000`.
+
+## Rebuild Forecast Database
+
+After adding new files named `YYYYMMDD_to_YYYYMMDD_fcst.csv` into `data/`, rebuild the local database and optimized browser JSON:
+
+```powershell
+python scripts\build_weather_db.py
+```
+
+The app loads `data/forecast_county_data.json` first for speed, with CSV parsing only as a fallback.

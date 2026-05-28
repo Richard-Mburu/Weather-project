@@ -30,10 +30,6 @@ const COUNTIES=[
   {id:47,name:'Nairobi',lat:-1.29,lon:36.82,area:696}
 ];
 
-/**
- * Session State: Manages user permissions and data scoping.
- * 'NATIONAL_ADMIN' sees everything; 'COUNTY_OFFICER' is restricted to a specific countyId.
- */
 let userSession={role:'NATIONAL_ADMIN',countyId:null};
 
 function isCountyMode(){return userSession.role==='COUNTY_OFFICER'&&userSession.countyId!==null;}
@@ -186,16 +182,11 @@ const DYNAMIC_CHOROPLETH_COLORS={
   wind:['#e8f5e9','#81c784','#26a69a','#673ab7','#b71c1c']
 };
 
-// Maps metric keys to human-readable units.
 function metricUnit(metric){
   return {rain:'mm',tmin:'°C',tmax:'°C',wind:'km/h'}[metric] || '';
 }
 
 // Stats Helper: Calculates value breaks for map shading based on the current data range.
-/**
- * Dynamic Breaks: Calculates Jenks-style natural breaks for choropleth shading
- * based on the specific range of the currently loaded data.
- */
 function getScopedMetricValues(metric){
   return activeCounties()
     .map(c=>cdata[c.id]&&Number(cdata[c.id][metric]))
@@ -674,7 +665,6 @@ const BorderModule=(()=>{
 // ═══════════════════════════════════════════
 // MODULE: SCHOOLS  (colour by rainfall risk)
 // Handles the distribution and clustering of school markers.
-// Handles the distribution and clustering of markers.
 // Schools are procedurally generated for the demo, but logic supports 
 // real coordinates. Markers change color dynamically based on weather data.
 // ═══════════════════════════════════════════
@@ -718,7 +708,6 @@ const SchoolModule=(()=>{
       }
     });
 
-    // Populate clusters with school points
     activeSchools().forEach((s,idx)=>{
       const risk = calculateSchoolRisk(s, cdata, rawCsvData);
       const col=RISK_COLORS[risk];
@@ -1304,10 +1293,6 @@ function findHeader(headers, names) {
   return headers.findIndex(h => names.includes(h.replace(/[\s_-]+/g, '')));
 }
 
-/**
- * Fuzzy CSV Parser:
- * Automatically detects latitude, longitude, and weather metrics regardless of header names.
- */
 function parseForecastCSV(text, name='forecast.csv') {
   const lines=text.trim().split(/\r?\n/);
   const sep=lines[0].includes('\t')?'\t':',';

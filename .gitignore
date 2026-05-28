@@ -1,0 +1,11 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+
+# Data Files (Optional: ignore large raw CSV datasets if necessary)
+# data/*.csv
